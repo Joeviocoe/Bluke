@@ -96,6 +96,25 @@ class PhoneKeyboardBridge(
         modifiers.consumeOnce()
     }
 
+    /**
+     * Types one code point exactly as written, ignoring latched modifiers. Used by the text box,
+     * whose copy of the text has to match the host's. Returns false when the host layout (and
+     * Unicode entry) cannot produce it; the caller reports those, once the whole edit is out.
+     */
+    fun typePlain(unit: String): Boolean {
+        val translation = HidCharMap.translate(unit, hostLayout(), unicodeMode())
+        if (translation.events.isEmpty()) return false
+        emit(translation.events.map { it.keyCode to it.isPress })
+        return true
+    }
+
+    /** Backspaces with no modifiers held, so a latched Ctrl cannot turn them into word deletes. */
+    fun backspacePlain(count: Int) {
+        if (count <= 0) return
+        val tap = listOf(KeyboardLayouts.KEY_BACKSPACE to true, KeyboardLayouts.KEY_BACKSPACE to false)
+        emit(List(count) { tap }.flatten())
+    }
+
     fun deleteBefore(count: Int) = repeat(count.coerceAtLeast(0)) { tapKey(KeyboardLayouts.KEY_BACKSPACE) }
 
     fun deleteAfter(count: Int) = repeat(count.coerceAtLeast(0)) { tapKey(KeyboardLayouts.KEY_DELETE) }

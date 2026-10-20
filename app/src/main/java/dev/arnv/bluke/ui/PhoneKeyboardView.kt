@@ -14,8 +14,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.PhoneAndroid
@@ -28,8 +30,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
@@ -49,6 +53,8 @@ const val HOST_LAYOUT_PREFERENCE = "host_layout"
 const val UNICODE_ENTRY_MODE_PREFERENCE = "unicode_entry_mode"
 private const val PHONE_KEYBOARD_SOUND_PREFERENCE = "phone_keyboard_sound_enabled"
 private const val PHONE_KEYBOARD_VIBRATION_PREFERENCE = "phone_keyboard_vibration_enabled"
+private const val PHONE_KEYBOARD_TEXT_BOX_PREFERENCE = "phone_keyboard_text_box_enabled"
+private const val PHONE_KEYBOARD_AUTO_TYPE_PREFERENCE = "phone_keyboard_auto_type_enabled"
 
 private val PhoneKeyboardCanvasColor = Color(0xFF1D1D1D)
 
@@ -56,12 +62,17 @@ private val PhoneKeyboardCanvasColor = Color(0xFF1D1D1D)
 private const val ECHO_TIMEOUT_MILLIS = 4_000L
 
 /**
- * Types on the host with whichever keyboard app the phone has installed.
+ * Types on the host with whichever keyboard app the phone has installed, in one of two ways:
  *
- * There is no text box: keystrokes go straight to the host as they are made (see
- * [PhoneKeyboardBridge] for why), and the host's own screen is where the text appears. Above the
- * keyboard sits a user-configurable bar of the keys a phone keyboard lacks - Ctrl, Alt, Esc, arrows,
- * F-keys - see [ImeKeyBar].
+ * - **Text box** (default): a multi-line field with the keyboard's autocorrect, selection, copy
+ *   and paste, auto-typed to the host as it changes or sent with Type, and taken back with Erase.
+ *   See [PhoneKeyboardTextBox].
+ * - **Direct**: no local text at all; keystrokes go straight to the host as they are made (see
+ *   [PhoneKeyboardBridge] for why), which suits terminals and anything else that edits the text on
+ *   the host's side.
+ *
+ * Above the keyboard sits a user-configurable bar of the keys a phone keyboard lacks - Ctrl, Alt,
+ * Esc, arrows, F-keys - see [ImeKeyBar].
  */
 @Composable
 fun PhoneKeyboardView(
@@ -99,6 +110,10 @@ fun PhoneKeyboardView(
                 sharedPrefs.getBoolean("haptics_enabled", true),
             )
         )
+    }
+
+    var isTextBoxMode by remember {
+        mutableStateOf(sharedPrefs.getBoolean(PHONE_KEYBOARD_TEXT_BOX_PREFERENCE, true))
     }
 
     var droppedNotice by remember { mutableStateOf<String?>(null) }
@@ -160,11 +175,35 @@ fun PhoneKeyboardView(
         )
     }
 
+    val textBox = remember(bridge) {
+        PhoneKeyboardTextBoxState(
+            bridge = bridge,
+            autoType = sharedPrefs.getBoolean(PHONE_KEYBOARD_AUTO_TYPE_PREFERENCE, true),
+            onDropped = { droppedNotice = it },
+            onKeystroke = { feedback() },
+        )
+    }
+    val textBoxFocus = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    fun showKeyboard() {
+        if (isTextBoxMode) {
+            textBoxFocus.requestFocus()
+            keyboardController?.show()
+        } else {
+            inputView.showKeyboard()
+        }
+    }
+
+    fun hideKeyboard() {
+        if (isTextBoxMode) keyboardController?.hide() else inputView.hideKeyboard()
+    }
+
     // Bring the keyboard up as soon as the mode opens - it is the whole point of the mode. The
     // short delay lets the view attach first; some OEM keyboards ignore an earlier request.
-    LaunchedEffect(inputView) {
+    LaunchedEffect(inputView, isTextBoxMode) {
         delay(150)
-        inputView.showKeyboard()
+        showKeyboard()
     }
 
     DisposableEffect(Unit) {
@@ -186,6 +225,11 @@ fun PhoneKeyboardView(
             statusNotice = "Clipboard is empty"
             return
         }
+        if (isTextBoxMode) {
+            // Into the box like a paste, so it can be checked first and erased afterwards.
+            textBox.insert(text)
+            return
+        }
         // Typed as plain text: a modifier latched for the next key should not turn a pasted
         // password into a string of shortcuts.
         val translation = HidCharMap.translate(text, hostLayout, unicodeMode)
@@ -197,10 +241,21 @@ fun PhoneKeyboardView(
     }
 
     fun onKeyBarPress(def: ImeKeyBar.KeyDef) {
+        // With auto-type on, the text box is the host's text, so keys that edit text go through
+        // the box; that keeps it, and Erase, in step with the host. Everything else goes straight
+        // to the host.
+        val editsTextBox = isTextBoxMode && textBox.autoType && bridge.modifiers.active().isEmpty()
         when (val action = def.action) {
-            is ImeKeyBar.Action.Key -> bridge.tapKey(action.keyCode)
+            is ImeKeyBar.Action.Key -> when {
+                editsTextBox && action.keyCode == KeyboardLayouts.KEY_ENTER -> textBox.insert("\n")
+                editsTextBox && action.keyCode == KeyboardLayouts.KEY_TAB -> textBox.insert("\t")
+                editsTextBox && action.keyCode == KeyboardLayouts.KEY_BACKSPACE && textBox.backspace() -> Unit
+                else -> bridge.tapKey(action.keyCode)
+            }
             is ImeKeyBar.Action.Combo -> bridge.tapKey(action.keyCode, action.modifiers)
-            is ImeKeyBar.Action.Char -> bridge.typeText(action.char.toString())
+            is ImeKeyBar.Action.Char ->
+                if (isTextBoxMode) textBox.insert(action.char.toString())
+                else bridge.typeText(action.char.toString())
             is ImeKeyBar.Action.Modifier -> {
                 latch.tap(action.keyCode)
                 latchRevision++
@@ -229,7 +284,7 @@ fun PhoneKeyboardView(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             ToolbarPill(onClick = {
-                inputView.hideKeyboard()
+                hideKeyboard()
                 onClose()
             }) {
                 Icon(Icons.Default.Close, "Close", tint = Color.White, modifier = Modifier.size(12.dp))
@@ -240,7 +295,7 @@ fun PhoneKeyboardView(
                 onClick = {
                     val enabled = sharedPrefs.enabledInputModes()
                     val index = enabled.indexOfFirst { it.id == launchMode }.coerceAtLeast(0)
-                    inputView.hideKeyboard()
+                    hideKeyboard()
                     onModeChange(enabled[(index + 1) % enabled.size].id)
                 },
                 onLongClick = {
@@ -257,6 +312,28 @@ fun PhoneKeyboardView(
                 )
             }
             Spacer(Modifier.weight(1f))
+            ToolbarPill(onClick = {
+                hideKeyboard()
+                isTextBoxMode = !isTextBoxMode
+                sharedPrefs.edit { putBoolean(PHONE_KEYBOARD_TEXT_BOX_PREFERENCE, isTextBoxMode) }
+                droppedNotice = null
+                statusNotice = null
+            }) {
+                Icon(
+                    if (isTextBoxMode) Icons.AutoMirrored.Filled.Notes else Icons.Default.Bolt,
+                    null,
+                    tint = Color.White,
+                    modifier = Modifier.size(12.dp),
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    if (isTextBoxMode) "Text box" else "Direct",
+                    color = Color.White,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.testTag("phone_keyboard_style_toggle"),
+                )
+            }
             ToolbarPill(onClick = {
                 isSoundEnabled = !isSoundEnabled
                 sharedPrefs.edit { putBoolean(PHONE_KEYBOARD_SOUND_PREFERENCE, isSoundEnabled) }
@@ -281,81 +358,87 @@ fun PhoneKeyboardView(
                     modifier = Modifier.size(14.dp).testTag("phone_keyboard_vibration_toggle"),
                 )
             }
-            ToolbarPill(onClick = { inputView.showKeyboard() }) {
+            ToolbarPill(onClick = { showKeyboard() }) {
                 Icon(Icons.Default.Keyboard, "Show keyboard", tint = Color.White, modifier = Modifier.size(14.dp))
             }
         }
 
-        // The rest of the screen is a target for bringing the keyboard back after it is dismissed.
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                ) { inputView.showKeyboard() }
-                .testTag("phone_keyboard_surface"),
-            contentAlignment = Alignment.Center,
-        ) {
-            // Zero-size host for the view that actually owns the IME connection.
-            AndroidView(factory = { inputView }, modifier = Modifier.size(1.dp).alpha(0f))
+        if (isTextBoxMode) {
+            PhoneKeyboardTextBox(
+                state = textBox,
+                focusRequester = textBoxFocus,
+                onAutoTypeChange = { enabled ->
+                    sharedPrefs.edit { putBoolean(PHONE_KEYBOARD_AUTO_TYPE_PREFERENCE, enabled) }
+                },
+                modifier = Modifier.fillMaxWidth().weight(1f),
+            )
             Column(
+                modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                val echoEntries = remember(latchRevision, echoClears) { echo.entries }
-                KeystrokeEchoLine(echoEntries)
                 Text(
-                    text = if (isConnected) {
-                        "Typing straight into the host as ${hostLayout.displayName}" +
-                            if (unicodeMode != UnicodeEntry.UnicodeEntryMode.OFF) " + ${unicodeMode.displayName}" else ""
-                    } else {
-                        "Not connected - nothing is being sent"
+                    text = when {
+                        !isConnected -> "Not connected - nothing is being sent"
+                        textBox.autoType -> "Auto-typing to the host as ${hostLayout.displayName}"
+                        else -> "Type sends to the host as ${hostLayout.displayName}"
                     },
-                    color = Color.White.copy(alpha = 0.7f),
-                    fontSize = 12.sp,
-                    textAlign = TextAlign.Center,
-                )
-                Text(
-                    text = "Watch the host's screen. Tap here if the keyboard goes away.",
-                    color = Color.White.copy(alpha = 0.45f),
+                    color = Color.White.copy(alpha = 0.6f),
                     fontSize = 11.sp,
                     textAlign = TextAlign.Center,
                 )
-                if (composing.isNotEmpty()) {
-                    // Some keyboards still compose a word before committing it; show it so the
-                    // wait before it reaches the host does not look like a dropped keystroke.
+                PhoneKeyboardNotices(droppedNotice, statusNotice, hostLayout, unicodeMode)
+            }
+        } else {
+            // The rest of the screen is a target for bringing the keyboard back after it is dismissed.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { inputView.showKeyboard() }
+                    .testTag("phone_keyboard_surface"),
+                contentAlignment = Alignment.Center,
+            ) {
+                // Zero-size host for the view that actually owns the IME connection.
+                AndroidView(factory = { inputView }, modifier = Modifier.size(1.dp).alpha(0f))
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                ) {
+                    val echoEntries = remember(latchRevision, echoClears) { echo.entries }
+                    KeystrokeEchoLine(echoEntries)
                     Text(
-                        text = "Composing: $composing",
-                        color = MaterialTheme.colorScheme.primary,
-                        fontSize = 12.sp,
-                        modifier = Modifier.testTag("phone_keyboard_composing"),
-                    )
-                }
-                droppedNotice?.let { dropped ->
-                    Text(
-                        text = if (unicodeMode == UnicodeEntry.UnicodeEntryMode.OFF) {
-                            "Skipped \"$dropped\" - not on a ${hostLayout.displayName} keyboard. " +
-                                "Turn on Unicode entry in Phone Keyboard settings to send these."
+                        text = if (isConnected) {
+                            "Typing straight into the host as ${hostLayout.displayName}" +
+                                if (unicodeMode != UnicodeEntry.UnicodeEntryMode.OFF) " + ${unicodeMode.displayName}" else ""
                         } else {
-                            "Skipped \"$dropped\" - ${unicodeMode.displayName} cannot express these"
+                            "Not connected - nothing is being sent"
                         },
-                        color = MaterialTheme.colorScheme.error,
-                        fontSize = 11.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.testTag("phone_keyboard_dropped_notice"),
-                    )
-                }
-                statusNotice?.let { status ->
-                    Text(
-                        text = status,
                         color = Color.White.copy(alpha = 0.7f),
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center,
+                    )
+                    Text(
+                        text = "Watch the host's screen. Tap here if the keyboard goes away.",
+                        color = Color.White.copy(alpha = 0.45f),
                         fontSize = 11.sp,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.testTag("phone_keyboard_status_notice"),
                     )
+                    if (composing.isNotEmpty()) {
+                        // Some keyboards still compose a word before committing it; show it so the
+                        // wait before it reaches the host does not look like a dropped keystroke.
+                        Text(
+                            text = "Composing: $composing",
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 12.sp,
+                            modifier = Modifier.testTag("phone_keyboard_composing"),
+                        )
+                    }
+                    PhoneKeyboardNotices(droppedNotice, statusNotice, hostLayout, unicodeMode)
                 }
             }
         }
@@ -394,6 +477,39 @@ fun PhoneKeyboardView(
             }
             ArrowCluster(onPress = ::onKeyBarPress)
         }
+    }
+}
+
+/** Characters the host could not be sent, and one-off status such as a clipboard send. */
+@Composable
+private fun PhoneKeyboardNotices(
+    droppedNotice: String?,
+    statusNotice: String?,
+    hostLayout: HostLayouts.HostLayout,
+    unicodeMode: UnicodeEntry.UnicodeEntryMode,
+) {
+    droppedNotice?.let { dropped ->
+        Text(
+            text = if (unicodeMode == UnicodeEntry.UnicodeEntryMode.OFF) {
+                "Skipped \"$dropped\" - not on a ${hostLayout.displayName} keyboard. " +
+                    "Turn on Unicode entry in Phone Keyboard settings to send these."
+            } else {
+                "Skipped \"$dropped\" - ${unicodeMode.displayName} cannot express these"
+            },
+            color = MaterialTheme.colorScheme.error,
+            fontSize = 11.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.testTag("phone_keyboard_dropped_notice"),
+        )
+    }
+    statusNotice?.let { status ->
+        Text(
+            text = status,
+            color = Color.White.copy(alpha = 0.7f),
+            fontSize = 11.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.testTag("phone_keyboard_status_notice"),
+        )
     }
 }
 
