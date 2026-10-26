@@ -13,13 +13,19 @@ For detailed usage instructions, see the [Usage Guide](docs/USAGE.md).
   The arrow keys sit together as their own block.
 - **Configurable Extra Keys:** Arrange rows of keys a phone keyboard lacks (Ctrl, Alt, Shift and Super as tap-to-latch modifiers, Esc, Tab, arrows, F-keys, symbols, host shortcuts) under Settings > Keyboard > Phone Keyboard.
 - **Host Keyboard Layouts & Unicode Entry:** Phone Keyboard and clipboard typing translate characters for the computer's layout (US, UK, German, Hungarian, French, Italian, Spanish, Swedish, Norwegian, Danish), with optional Linux, Windows and macOS Unicode entry for characters a layout cannot type.
+- **Multimedia Long-Press Keys:** Tap **B** to blank a slideshow to black, or long-press it for white (**W**). Tap **Esc** as before, or long-press it for **F** (fullscreen in YouTube, Netflix and VLC). Each button shows its long-press key in small type underneath.
+- **Multimedia Speed and Frame Keys:** Small keys fill the corners around the arrow pad: playback speed (tap **< >** for YouTube, long-press **[ ]** for VLC and mpv) above, and **, .** frame-step below.
+- **Fullscreen Toggle:** Settings > Look & Feel can keep the status and navigation bars visible while an input mode is open (fullscreen stays the default).
 
 ### Changed
 - **Input Mode Dropdown:** The mode button opens a list of your enabled modes instead of cycling to the next one.
 - **Multimedia Trackpad Hidden by Default:** The trackpad and mouse buttons now sit behind a toolbar toggle, and the remote buttons grow to fill the space.
+- **Bigger, Colour-Coded Multimedia Buttons:** The remote buttons fill the screen with or without the trackpad, use larger symbols and labels, and are tinted by function (media, arrows, OK, Home/End/PgUp/PgDn, presentation, system, mouse). Home, End, PgUp and PgDn follow the full-size keyboard arrangement.
+- **Launch Button Shows the Mode:** On Home, the Launch button carries the selected mode's icon and the mode picker beside it shows ^.
 
 ### Fixed
-- **Multimedia Arrows When Upright:** The arrow pad now turns with the phone, so each arrow sends the direction it points.
+- **Multimedia Arrows and Trackpad When Upright:** The arrow pad and trackpad now turn with the phone, so each arrow sends the direction it points and swipes move the pointer the way you swipe.
+- **Multimedia With Fullscreen Off:** The screen turns with the phone, so the status bar stays on the top edge when held upright.
 
 ## [1.1.0] - 2026-10-09
 

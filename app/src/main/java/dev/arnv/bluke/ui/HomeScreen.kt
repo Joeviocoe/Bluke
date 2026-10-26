@@ -117,6 +117,7 @@ fun HomeScreen(
     
     val view = LocalView.current
     var isHapticsEnabled by remember { mutableStateOf(sharedPrefs.getBoolean("haptics_enabled", true)) }
+    var isFullscreenEnabled by remember { mutableStateOf(sharedPrefs.getBoolean(FULLSCREEN_PREFERENCE, true)) }
     var keySensitivity by remember { mutableFloatStateOf(sharedPrefs.getFloat("key_sensitivity", 6f)) }
     var lockSyncMode by remember { mutableStateOf(sharedPrefs.getString("lock_sync_mode", "host") ?: "host") }
     var launchMode by rememberSaveable {
@@ -147,6 +148,7 @@ fun HomeScreen(
                 currentSwitch = soundSynth.getCurrentSwitch()
                 currentSoundProfileName = soundSynth.getSelectedSoundProfileName()
                 isHapticsEnabled = sharedPrefs.getBoolean("haptics_enabled", true)
+                isFullscreenEnabled = sharedPrefs.getBoolean(FULLSCREEN_PREFERENCE, true)
                 keySensitivity = sharedPrefs.getFloat("key_sensitivity", 6f)
                 lockSyncMode = sharedPrefs.getString("lock_sync_mode", "host") ?: "host"
                 characterLayout = KeyboardCharacterLayout.fromPreference(
@@ -431,17 +433,29 @@ fun HomeScreen(
     // Phone Keyboard mode needs the soft keyboard, which cannot share the screen with the
     // forced-landscape immersive plate - so it stays portrait with system bars, like the home screen.
     val immersiveKeyboard = isKeyboardActive && launchMode != InputMode.PHONE_KEYBOARD.id
+    val hideSystemBars = immersiveKeyboard && isFullscreenEnabled
+    // Multimedia has an upright layout. With the bars showing, let the screen turn with the phone
+    // so the status bar stays on the top edge instead of along the side.
+    val multimediaFollowsRotation = immersiveKeyboard && !isFullscreenEnabled &&
+        launchMode == InputMode.MEDIA_PRESENTATION.id
 
     // Toggle orientation and full-screen layout helper automatically
-    LaunchedEffect(immersiveKeyboard) {
+    LaunchedEffect(immersiveKeyboard, hideSystemBars, multimediaFollowsRotation) {
         val activity = context as? Activity ?: return@LaunchedEffect
         val window = activity.window ?: return@LaunchedEffect
-        if (immersiveKeyboard) {
-            try {
+        try {
+            if (multimediaFollowsRotation) {
+                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR
+            } else if (immersiveKeyboard) {
                 activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-            } catch (e: Exception) {
-                Log.e("HomeScreen", "Error setting orientation to landscape: ${e.message}")
+            } else {
+                @Suppress("SourceLockedOrientationActivity")
+                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
             }
+        } catch (e: Exception) {
+            Log.e("HomeScreen", "Error setting orientation: ${e.message}")
+        }
+        if (hideSystemBars) {
             // Hide System UI for immersive mechanical keypad experience
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -462,13 +476,7 @@ fun HomeScreen(
                 Log.e("HomeScreen", "Error hiding system bars: ${e.message}")
             }
         } else {
-            try {
-                @Suppress("SourceLockedOrientationActivity")
-                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-            } catch (e: Exception) {
-                Log.e("HomeScreen", "Error setting orientation to portrait: ${e.message}")
-            }
-            // Show system UI normally in config mode
+            // Show system UI normally in config mode, or when fullscreen is turned off
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                     window.insetsController?.show(
@@ -599,8 +607,18 @@ fun HomeScreen(
 
 
 
+    // With fullscreen off the system bars stay up over the landscape surfaces, so keep the
+    // controls clear of them. Phone Keyboard pads itself for the soft keyboard.
+    val keepClearOfSystemBars = immersiveKeyboard && !isFullscreenEnabled
     AnimatedContent(
         targetState = isKeyboardActive,
+        modifier = if (keepClearOfSystemBars) {
+            Modifier
+                .background(Color.Black)
+                .windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout))
+        } else {
+            Modifier
+        },
         transitionSpec = {
             fadeIn() togetherWith fadeOut()
         },
@@ -672,6 +690,7 @@ fun HomeScreen(
                                     },
                                     sharedPrefs = sharedPrefs,
                                     isConnected = isConnected,
+                                    followsScreenRotation = multimediaFollowsRotation,
                                 )
                             }
                             InputMode.PHONE_KEYBOARD.id -> {
@@ -1297,7 +1316,7 @@ fun HomeScreen(
                                         .testTag("mode_toggle_btn")
                                 ) {
                                     Icon(
-                                        imageVector = InputMode.fromId(launchMode).icon,
+                                        imageVector = Icons.Default.KeyboardArrowUp,
                                         contentDescription = "Choose Input Mode",
                                         tint = MaterialTheme.colorScheme.onSecondaryContainer,
                                         modifier = Modifier.size(26.dp)
@@ -1331,7 +1350,7 @@ fun HomeScreen(
                                     else -> "Launch Keyboard"
                                 }
                                 Icon(
-                                    imageVector = Icons.Default.KeyboardArrowUp,
+                                    imageVector = InputMode.fromId(launchMode).icon,
                                     contentDescription = "Launch Icon",
                                     modifier = Modifier.size(24.dp)
                                 )

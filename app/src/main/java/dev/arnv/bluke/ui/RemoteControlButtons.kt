@@ -43,6 +43,9 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.isSpecified
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import dev.arnv.bluke.bluetooth.BluetoothKeyboardManager
@@ -87,12 +90,18 @@ internal fun KeyboardButton(
 internal fun RemoteHoldButton(
     label: String,
     icon: ImageVector?,
+    // Visible text when it differs from the spoken label, e.g. "B" for "Black screen".
+    text: String = label,
+    // Smaller, faded second line under the text, e.g. what a long-press sends.
+    hint: String? = null,
     modifier: Modifier,
     fillHeight: Boolean = false,
     showLabel: Boolean = true,
     contentRotation: Float = 0f,
     cornerRadius: Dp = 16.dp,
     showBorder: Boolean = true,
+    iconSize: Dp = 20.dp,
+    labelFontSize: TextUnit = TextUnit.Unspecified,
     containerColor: Color? = null,
     contentColor: Color? = null,
     onPressFeedback: () -> Unit = {},
@@ -162,15 +171,46 @@ internal fun RemoteHoldButton(
                 null,
                 tint = resolvedContentColor,
                 modifier = Modifier
-                    .size(20.dp)
+                    .size(iconSize)
                     .graphicsLayer { rotationZ = contentRotation },
             )
         }
-        if (showLabel) {
+        if (showLabel && hint != null) {
+            val mainSize = if (labelFontSize.isSpecified) labelFontSize else 14.sp
+            val hintSize = mainSize * 0.6f
+            // A quarter turn swaps the lines' layout too, so both lines stay inside the button.
+            val turned = when (contentRotation) {
+                0f -> Modifier
+                -90f -> Modifier.rotateLayoutQuarterTurn(clockwise = false)
+                90f -> Modifier.rotateLayoutQuarterTurn(clockwise = true)
+                else -> Modifier.graphicsLayer { rotationZ = contentRotation }
+            }
+            Column(modifier = turned, horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontSize = mainSize,
+                    lineHeight = mainSize,
+                    fontWeight = FontWeight.SemiBold,
+                    color = resolvedContentColor,
+                    maxLines = 1,
+                )
+                Text(
+                    hint,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontSize = hintSize,
+                    lineHeight = hintSize,
+                    fontWeight = FontWeight.SemiBold,
+                    color = resolvedContentColor.copy(alpha = 0.6f),
+                    maxLines = 1,
+                )
+            }
+        } else if (showLabel) {
             Text(
-                label,
+                text,
                 modifier = Modifier.graphicsLayer { rotationZ = contentRotation },
                 style = MaterialTheme.typography.labelMedium,
+                fontSize = labelFontSize,
                 fontWeight = FontWeight.SemiBold,
                 color = resolvedContentColor,
                 maxLines = 1,

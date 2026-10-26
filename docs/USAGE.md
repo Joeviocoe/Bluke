@@ -87,8 +87,10 @@ Bluke includes **three controller profiles** that switch instantly without disco
 ### Multimedia Remote
 A dedicated remote for couch media browsing and presentations.
 
-- **Presentation Controls:** Start a slideshow (F5), navigate slides (Next/Previous), or exit (Escape), with an optional mini-touchpad for pointing.
+- **Presentation Controls:** Start a slideshow (F5), navigate slides (Next/Previous), or exit (Escape). Tap **B** to blank the screen to black, or long-press it for white (**W**). Long-press **Esc** to send **F**, which toggles fullscreen in YouTube, Netflix and VLC. Buttons with a long-press option show it in small type under their label.
 - **Trackpad Toggle:** The trackpad and mouse buttons start hidden so the remote buttons can fill the screen. Tap **Trackpad** in the toolbar to show them; Bluke remembers your choice.
+- **Speed and Frame Keys:** Small keys sit in the corners around the arrow pad. Above it, tap **<** / **>** to slow down or speed up YouTube, or long-press them to send **[** / **]** for VLC and mpv. Below it, **,** / **.** step one frame back or forward in YouTube (while paused) and mpv.
+- **Colour-Coded Buttons:** Buttons are tinted by what they do: blue for media, green for the arrow pad, teal for OK, rose for Home, End, PgUp and PgDn, amber for presentation keys, olive for the small keys around the arrow pad, grey for system keys, and violet for the mouse buttons. Home, End, PgUp and PgDn are arranged as on a full-size keyboard in both orientations.
 - **Media Controls:** Play/Pause, Next/Previous track, and Volume Up/Down/Mute.
 - **Adaptive Layout:** Automatically rearranges buttons for easy one-handed thumb use whether holding your phone upright (portrait) or sideways (landscape). The arrow pad turns with the phone, so each arrow always sends the direction it points.
 - **Phone Volume Buttons:** Optionally use your phone's physical volume rocker to adjust your computer's volume while the Multimedia screen is open.
@@ -121,7 +123,7 @@ Type on the computer with your phone's own keyboard app (Gboard, SwiftKey, and s
   * Choose from 12 built-in switch sounds: *Cherry MX Brown, Holy Panda, Alpaca, Turquoise Tealios, Gateron Black Ink, Cherry MX Black, Cherry MX Blue, Kailh Box Navy, Buckling Spring, SKCM Blue Alps, Topre 45g, NovelKeys Cream*.
   * **Import Mechvibes Packs:** Tap Import to load any standard Mechvibes ZIP sound pack (including audio sprite packs) from your phone's files.
   * Delete imported packs anytime (built-in switch sounds are permanently available).
-* **Look & Feel:** Toggle pure OLED black mode, keypress vibration (haptics), and Material You dynamic system colors.
+* **Look & Feel:** Toggle pure OLED black mode, keypress vibration (haptics), Material You dynamic system colors, and **Fullscreen** (on by default), which hides the status and navigation bars while an input mode is open.
 
 ### Controls & Connection
 * **Quick-Cycle Choices:** Pick which layouts, themes, sounds, and controller modes appear when tapping toolbar buttons.

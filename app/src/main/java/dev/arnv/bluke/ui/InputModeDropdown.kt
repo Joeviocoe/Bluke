@@ -103,11 +103,17 @@ internal fun InputModeDropdown(
 }
 
 // Lays the content out sideways: its width becomes our height and vice versa, then draws it
-// rotated -90 degrees so it reads upright for a phone held in portrait over a landscape UI.
-// Intrinsics are swapped too, since DropdownMenu sizes its column from them.
-private fun Modifier.rotateLayoutCounterClockwise(): Modifier = this.then(RotateCounterClockwise)
+// turned a quarter turn. Intrinsics are swapped too, since DropdownMenu sizes its column from them.
+internal fun Modifier.rotateLayoutQuarterTurn(clockwise: Boolean): Modifier =
+    this.then(if (clockwise) RotateQuarterTurn.Clockwise else RotateQuarterTurn.CounterClockwise)
 
-private object RotateCounterClockwise : LayoutModifier {
+private fun Modifier.rotateLayoutCounterClockwise(): Modifier = rotateLayoutQuarterTurn(clockwise = false)
+
+private enum class RotateQuarterTurn(val degrees: Float) : LayoutModifier {
+    Clockwise(90f),
+    CounterClockwise(-90f),
+    ;
+
     override fun MeasureScope.measure(measurable: Measurable, constraints: Constraints): MeasureResult {
         val placeable = measurable.measure(
             Constraints(
@@ -121,7 +127,7 @@ private object RotateCounterClockwise : LayoutModifier {
             placeable.placeWithLayer(
                 x = (placeable.height - placeable.width) / 2,
                 y = (placeable.width - placeable.height) / 2,
-            ) { rotationZ = -90f }
+            ) { rotationZ = degrees }
         }
     }
 

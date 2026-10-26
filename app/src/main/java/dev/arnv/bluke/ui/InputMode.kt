@@ -4,6 +4,8 @@ import android.content.SharedPreferences
 import androidx.core.content.edit
 
 private const val INPUT_MODE_CYCLE_PREFERENCE = "cycle_connection_modes"
+// Hide the status and navigation bars while an input mode is open (Settings > Look & Feel).
+const val FULLSCREEN_PREFERENCE = "fullscreen_enabled"
 
 enum class InputMode(
     val id: Int,

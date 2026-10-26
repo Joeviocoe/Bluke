@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
+import dev.arnv.bluke.ui.FULLSCREEN_PREFERENCE
 import dev.arnv.bluke.ui.SettingsCardGroup
 import dev.arnv.bluke.ui.SettingsItemData
 import dev.arnv.bluke.ui.theme.MyApplicationTheme
@@ -50,6 +51,7 @@ class LookAndFeelActivity : ComponentActivity() {
                 
                 var hapticsEnabled by remember { mutableStateOf(sharedPrefs.getBoolean("haptics_enabled", true)) }
                 var keySoundEnabled by remember { mutableStateOf(sharedPrefs.getBoolean("key_sound_enabled", true)) }
+                var fullscreenEnabled by remember { mutableStateOf(sharedPrefs.getBoolean(FULLSCREEN_PREFERENCE, true)) }
                 
                 var showPaletteDialog by remember { mutableStateOf(false) }
                 val themeMode by themeModeState
@@ -258,6 +260,20 @@ class LookAndFeelActivity : ComponentActivity() {
                                     icon = { Icon(Icons.Default.DarkMode, null, tint = MaterialTheme.colorScheme.primary) },
                                     onClick = { 
                                         startActivity(Intent(this@LookAndFeelActivity, DarkThemeActivity::class.java))
+                                    }
+                                ),
+                                SettingsItemData(
+                                    title = "Fullscreen",
+                                    subtitle = "Hide the status and navigation bars while an input mode is open",
+                                    icon = { Icon(Icons.Default.Fullscreen, null, tint = MaterialTheme.colorScheme.primary) },
+                                    action = {
+                                        Switch(
+                                            checked = fullscreenEnabled,
+                                            onCheckedChange = {
+                                                fullscreenEnabled = it
+                                                sharedPrefs.edit { putBoolean(FULLSCREEN_PREFERENCE, it) }
+                                            }
+                                        )
                                     }
                                 ),
                                 SettingsItemData(
