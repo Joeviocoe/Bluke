@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -590,32 +591,37 @@ fun GamepadView(
                         Text("Close", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                     }
 
-                    // Mode cycle
-                    Row(
-                        modifier = Modifier
-                            .height(28.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color.White.copy(alpha = 0.15f))
-                            .combinedClickable(
-                                onClickLabel = "Next input mode",
-                                onLongClickLabel = "Configure input mode cycle",
-                                onClick = {
-                                    val enabledModes = sharedPrefs.enabledInputModes().map(InputMode::id)
-                                    val idx = enabledModes.indexOf(launchMode)
-                                    onModeChange(enabledModes[(idx + 1) % enabledModes.size])
-                                    triggerVibration(25)
-                                },
-                                onLongClick = {
-                                    context.startActivity(Intent(context, QuickCycleActivity::class.java))
-                                },
-                            )
-                            .padding(horizontal = 8.dp)
-                            .testTag("gamepad_mode_cycle_btn"),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(Icons.Default.SportsEsports, "Switch Mode", tint = Color.White, modifier = Modifier.size(11.dp))
-                        Text("Gamepad Mode", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    // Mode picker
+                    InputModeDropdown(
+                        currentMode = launchMode,
+                        sharedPrefs = sharedPrefs,
+                        onModeSelected = { mode ->
+                            onModeChange(mode)
+                            triggerVibration(25)
+                        },
+                    ) { openMenu ->
+                        Row(
+                            modifier = Modifier
+                                .height(28.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color.White.copy(alpha = 0.15f))
+                                .combinedClickable(
+                                    onClickLabel = "Choose input mode",
+                                    onLongClickLabel = "Configure input mode cycle",
+                                    onClick = openMenu,
+                                    onLongClick = {
+                                        context.startActivity(Intent(context, QuickCycleActivity::class.java))
+                                    },
+                                )
+                                .padding(horizontal = 8.dp)
+                                .testTag("gamepad_mode_cycle_btn"),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(Icons.Default.SportsEsports, "Switch Mode", tint = Color.White, modifier = Modifier.size(11.dp))
+                            Text("Gamepad Mode", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                            Icon(Icons.Default.ArrowDropDown, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                        }
                     }
 
                     // Connection status

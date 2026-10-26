@@ -33,6 +33,7 @@ import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -169,6 +170,9 @@ internal fun MediaPresentationView(
     var isVibrationEnabled by remember {
         mutableStateOf(sharedPrefs.getBoolean("touchpad_vibration_enabled", true))
     }
+    var isTrackpadVisible by remember {
+        mutableStateOf(sharedPrefs.getBoolean(MULTIMEDIA_TRACKPAD_VISIBLE_PREFERENCE, false))
+    }
 
     @Suppress("DEPRECATION")
     fun triggerVibration(milliseconds: Long) {
@@ -234,10 +238,10 @@ internal fun MediaPresentationView(
         sharedPrefs.edit { putFloat("touchpad_scroll_sensitivity", scrollSensitivity) }
         triggerVibration(15)
     }
-    val cycleMode = {
-        val enabled = sharedPrefs.enabledInputModes()
-        val index = enabled.indexOfFirst { it.id == launchMode }.coerceAtLeast(0)
-        onModeChange(enabled[(index + 1) % enabled.size].id)
+    val toggleTrackpad = {
+        isTrackpadVisible = !isTrackpadVisible
+        sharedPrefs.edit { putBoolean(MULTIMEDIA_TRACKPAD_VISIBLE_PREFERENCE, isTrackpadVisible) }
+        triggerVibration(15)
     }
     val toggleVibration = {
         isVibrationEnabled = !isVibrationEnabled
@@ -264,10 +268,13 @@ internal fun MediaPresentationView(
                 onScrollSensitivityChange = cycleScrollSensitivity,
                 isVibrationEnabled = isVibrationEnabled,
                 onToggleVibration = toggleVibration,
+                isTrackpadVisible = isTrackpadVisible,
+                onToggleTrackpad = toggleTrackpad,
             )
             MultimediaControlCanvas(
                 btManager = btManager,
                 posture = resolvedPosture,
+                showTrackpad = isTrackpadVisible,
                 sensitivity = sensitivity,
                 scrollSensitivity = scrollSensitivity,
                 triggerVibration = ::triggerVibration,
@@ -279,7 +286,9 @@ internal fun MediaPresentationView(
             MultimediaUprightBar(
                 btManager = btManager,
                 onClose = onClose,
-                onModeChange = cycleMode,
+                launchMode = launchMode,
+                onModeChange = onModeChange,
+                sharedPrefs = sharedPrefs,
                 isConnected = isConnected,
                 sensitivity = sensitivity,
                 onSensitivityChange = cycleSensitivity,
@@ -287,10 +296,13 @@ internal fun MediaPresentationView(
                 onScrollSensitivityChange = cycleScrollSensitivity,
                 isVibrationEnabled = isVibrationEnabled,
                 onToggleVibration = toggleVibration,
+                isTrackpadVisible = isTrackpadVisible,
+                onToggleTrackpad = toggleTrackpad,
             )
             MultimediaControlCanvas(
                 btManager = btManager,
                 posture = resolvedPosture,
+                showTrackpad = isTrackpadVisible,
                 sensitivity = sensitivity,
                 scrollSensitivity = scrollSensitivity,
                 triggerVibration = ::triggerVibration,
@@ -304,20 +316,47 @@ internal fun MediaPresentationView(
 private fun MultimediaControlCanvas(
     btManager: BluetoothKeyboardManager,
     posture: MultimediaPosture,
+    showTrackpad: Boolean,
     sensitivity: Float,
     scrollSensitivity: Float,
     triggerVibration: (Long) -> Unit,
     modifier: Modifier,
 ) {
+    val startPadding = if (posture == MultimediaPosture.LANDSCAPE) 32.dp else 24.dp
     BoxWithConstraints(
         modifier = modifier.padding(
-            start = if (posture == MultimediaPosture.LANDSCAPE) 32.dp else 24.dp,
+            start = startPadding,
             top = if (posture == MultimediaPosture.LANDSCAPE) 4.dp else 28.dp,
-            end = if (posture == MultimediaPosture.LANDSCAPE) 13.dp else 23.dp,
+            end = when {
+                !showTrackpad -> startPadding
+                posture == MultimediaPosture.LANDSCAPE -> 13.dp
+                else -> 23.dp
+            },
             bottom = if (posture == MultimediaPosture.LANDSCAPE) 22.dp else 28.dp,
         ),
     ) {
         val compact = maxHeight < 280.dp
+        val horizontalGap = when {
+            posture == MultimediaPosture.PORTRAIT_HELD -> 7.5f.dp
+            compact -> 7.dp
+            else -> 8.dp
+        }
+        val verticalGap = if (compact) 7.dp else 8.dp
+        if (!showTrackpad) {
+            // Without the trackpad the deck takes the whole canvas: two groups of three
+            // columns (two gaps inside each, a triple gap between them) by four rows.
+            MultimediaButtonDeck(
+                btManager = btManager,
+                posture = posture,
+                buttonWidth = (maxWidth - horizontalGap * 7) / 6,
+                buttonHeight = (maxHeight - verticalGap * 3) / 4,
+                horizontalGap = horizontalGap,
+                verticalGap = verticalGap,
+                triggerVibration = triggerVibration,
+                modifier = Modifier.fillMaxSize(),
+            )
+            return@BoxWithConstraints
+        }
         val controlWidth = when {
             posture == MultimediaPosture.PORTRAIT_HELD -> 48.5f.dp
             compact -> 46.dp
@@ -328,12 +367,6 @@ private fun MultimediaControlCanvas(
             compact -> 46.dp
             else -> 52.dp
         }
-        val horizontalGap = when {
-            posture == MultimediaPosture.PORTRAIT_HELD -> 7.5f.dp
-            compact -> 7.dp
-            else -> 8.dp
-        }
-        val verticalGap = if (compact) 7.dp else 8.dp
         Row(
             modifier = Modifier.fillMaxSize(),
             horizontalArrangement = Arrangement.spacedBy(if (compact) 18.dp else 24.dp),
@@ -404,27 +437,22 @@ private fun MultimediaButtonDeck(
             }
         }
 
+        // Upright content is drawn rotated -90 degrees, so the holder's up is the screen's left.
+        // Rotate the D-pad with it so each arrow sends the direction it appears to point.
+        val (topArrow, leftArrow, rightArrow, bottomArrow) = if (posture == MultimediaPosture.PORTRAIT_HELD) {
+            listOf(rightArrowAction, upArrowAction, downArrowAction, leftArrowAction)
+        } else {
+            listOf(upArrowAction, leftArrowAction, rightArrowAction, downArrowAction)
+        }
         Column(verticalArrangement = Arrangement.spacedBy(verticalGap)) {
             Row(
                 modifier = Modifier.width(buttonWidth * 3 + horizontalGap * 2),
                 horizontalArrangement = Arrangement.Center,
             ) {
-                MultimediaActionButton(
-                    RemoteAction.Key("Up", Icons.Default.KeyboardArrowUp, KeyboardLayouts.KEY_UP),
-                    btManager,
-                    buttonWidth,
-                    buttonHeight,
-                    triggerVibration = triggerVibration,
-                )
+                MultimediaActionButton(topArrow, btManager, buttonWidth, buttonHeight, contentRotation, triggerVibration)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(horizontalGap)) {
-                MultimediaActionButton(
-                    RemoteAction.Key("Left", Icons.AutoMirrored.Filled.KeyboardArrowLeft, KeyboardLayouts.KEY_LEFT),
-                    btManager,
-                    buttonWidth,
-                    buttonHeight,
-                    triggerVibration = triggerVibration,
-                )
+                MultimediaActionButton(leftArrow, btManager, buttonWidth, buttonHeight, contentRotation, triggerVibration)
                 MultimediaActionButton(
                     RemoteAction.Key("OK", null, KeyboardLayouts.KEY_ENTER),
                     btManager,
@@ -433,25 +461,13 @@ private fun MultimediaButtonDeck(
                     contentRotation,
                     triggerVibration,
                 )
-                MultimediaActionButton(
-                    RemoteAction.Key("Right", Icons.AutoMirrored.Filled.KeyboardArrowRight, KeyboardLayouts.KEY_RIGHT),
-                    btManager,
-                    buttonWidth,
-                    buttonHeight,
-                    triggerVibration = triggerVibration,
-                )
+                MultimediaActionButton(rightArrow, btManager, buttonWidth, buttonHeight, contentRotation, triggerVibration)
             }
             Row(
                 modifier = Modifier.width(buttonWidth * 3 + horizontalGap * 2),
                 horizontalArrangement = Arrangement.Center,
             ) {
-                MultimediaActionButton(
-                    RemoteAction.Key("Down", Icons.Default.KeyboardArrowDown, KeyboardLayouts.KEY_DOWN),
-                    btManager,
-                    buttonWidth,
-                    buttonHeight,
-                    triggerVibration = triggerVibration,
-                )
+                MultimediaActionButton(bottomArrow, btManager, buttonWidth, buttonHeight, contentRotation, triggerVibration)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(horizontalGap)) {
                 MultimediaActionButton(
@@ -735,6 +751,10 @@ private val endAction = RemoteAction.Key("End", null, KeyboardLayouts.KEY_END)
 private val pageUpAction = RemoteAction.Key("PgUp", null, KeyboardLayouts.KEY_PAGEUP)
 private val pageDownAction = RemoteAction.Key("PgDn", null, KeyboardLayouts.KEY_PAGEDOWN)
 private val blackAction = RemoteAction.Key("Black", null, KeyboardLayouts.KEY_B)
+private val upArrowAction = RemoteAction.Key("Up", Icons.Default.KeyboardArrowUp, KeyboardLayouts.KEY_UP)
+private val downArrowAction = RemoteAction.Key("Down", Icons.Default.KeyboardArrowDown, KeyboardLayouts.KEY_DOWN)
+private val leftArrowAction = RemoteAction.Key("Left", Icons.AutoMirrored.Filled.KeyboardArrowLeft, KeyboardLayouts.KEY_LEFT)
+private val rightArrowAction = RemoteAction.Key("Right", Icons.AutoMirrored.Filled.KeyboardArrowRight, KeyboardLayouts.KEY_RIGHT)
 
 private val landscapeMediaRows = listOf(
     listOf(muteAction, volumeUpAction, volumeDownAction),
@@ -754,7 +774,9 @@ private val portraitHeldMediaRows = listOf(
 private fun MultimediaUprightBar(
     btManager: BluetoothKeyboardManager,
     onClose: () -> Unit,
-    onModeChange: () -> Unit,
+    launchMode: Int,
+    onModeChange: (Int) -> Unit,
+    sharedPrefs: SharedPreferences,
     isConnected: Boolean,
     sensitivity: Float,
     onSensitivityChange: () -> Unit,
@@ -762,6 +784,8 @@ private fun MultimediaUprightBar(
     onScrollSensitivityChange: () -> Unit,
     isVibrationEnabled: Boolean,
     onToggleVibration: () -> Unit,
+    isTrackpadVisible: Boolean,
+    onToggleTrackpad: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -775,8 +799,15 @@ private fun MultimediaUprightBar(
         UprightToolbarButton("Close Multimedia", onClose) {
             Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(13.dp))
         }
-        UprightToolbarButton("Switch input mode", onModeChange) {
-            Icon(Icons.Default.Mouse, null, tint = Color.White, modifier = Modifier.size(13.dp))
+        InputModeDropdown(
+            currentMode = launchMode,
+            sharedPrefs = sharedPrefs,
+            onModeSelected = onModeChange,
+            rotateContent = true,
+        ) { openMenu ->
+            UprightToolbarButton("Switch input mode", openMenu) {
+                Icon(InputMode.MEDIA_PRESENTATION.icon, null, tint = Color.White, modifier = Modifier.size(13.dp))
+            }
         }
         Box(
             Modifier
@@ -789,6 +820,17 @@ private fun MultimediaUprightBar(
         )
         ReconnectHostButton(btManager, iconOnly = true)
         Spacer(Modifier.weight(1f))
+        UprightToolbarButton(
+            if (isTrackpadVisible) "Hide trackpad" else "Show trackpad",
+            onToggleTrackpad,
+        ) {
+            Icon(
+                Icons.Default.Mouse,
+                null,
+                tint = if (isTrackpadVisible) Color.White else Color.White.copy(alpha = 0.4f),
+                modifier = Modifier.size(13.dp),
+            )
+        }
         UprightToolbarButton("Pointer sensitivity ${sensitivity}x", onSensitivityChange) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -859,6 +901,8 @@ private fun MultimediaTopBar(
     onScrollSensitivityChange: () -> Unit,
     isVibrationEnabled: Boolean,
     onToggleVibration: () -> Unit,
+    isTrackpadVisible: Boolean,
+    onToggleTrackpad: () -> Unit,
 ) {
     val context = LocalContext.current
     val connectedDevice by btManager.connectedDevice.collectAsState()
@@ -885,19 +929,22 @@ private fun MultimediaTopBar(
                 Spacer(Modifier.width(4.dp))
                 Text("Close", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
             }
-            ToolbarPill(
-                onClick = {
-                    val enabled = sharedPrefs.enabledInputModes()
-                    val index = enabled.indexOfFirst { it.id == launchMode }.coerceAtLeast(0)
-                    onModeChange(enabled[(index + 1) % enabled.size].id)
-                },
-                onLongClick = {
-                    context.startActivity(Intent(context, QuickCycleActivity::class.java))
-                },
-            ) {
-                Icon(Icons.Default.Mouse, "Switch mode", tint = Color.White, modifier = Modifier.size(12.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("Multimedia", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            InputModeDropdown(
+                currentMode = launchMode,
+                sharedPrefs = sharedPrefs,
+                onModeSelected = onModeChange,
+            ) { openMenu ->
+                ToolbarPill(
+                    onClick = openMenu,
+                    onLongClick = {
+                        context.startActivity(Intent(context, QuickCycleActivity::class.java))
+                    },
+                ) {
+                    Icon(InputMode.MEDIA_PRESENTATION.icon, "Switch mode", tint = Color.White, modifier = Modifier.size(12.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Multimedia", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.ArrowDropDown, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                }
             }
             Box(
                 Modifier
@@ -919,6 +966,21 @@ private fun MultimediaTopBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            ToolbarPill(onClick = onToggleTrackpad) {
+                Icon(
+                    Icons.Default.Mouse,
+                    null,
+                    tint = if (isTrackpadVisible) Color.White else Color.White.copy(alpha = 0.4f),
+                    modifier = Modifier.size(12.dp),
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    if (isTrackpadVisible) "Hide trackpad" else "Trackpad",
+                    color = Color.White,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
             ToolbarPill(onClick = onSensitivityChange) {
                 Icon(Icons.Default.Speed, "Sensitivity", tint = Color.White, modifier = Modifier.size(12.dp))
                 Spacer(Modifier.width(4.dp))
@@ -949,6 +1011,7 @@ private fun MultimediaTopBar(
 }
 
 private const val KEY_APPLICATION = 0x65
+internal const val MULTIMEDIA_TRACKPAD_VISIBLE_PREFERENCE = "multimedia_trackpad_visible"
 private const val POSTURE_ENTRY_DEGREES = 20
 internal const val POSTURE_STABILITY_MILLIS = 500L
 

@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -739,46 +740,49 @@ fun HomeScreen(
                                     )
                                 }
 
-                                // Rotating Mode Switcher
-                                Row(
-                                    modifier = Modifier
-                                        .height(28.dp)
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(Color.White.copy(alpha = 0.15f))
-                                        .combinedClickable(
-                                            onClickLabel = "Next input mode",
-                                            onLongClickLabel = "Configure input mode cycle",
-                                            onClick = {
-                                                val enabledModes = sharedPrefs.enabledInputModes().map(InputMode::id)
-                                                val currentIndexInEnabled = enabledModes.indexOf(launchMode)
-                                                val nextIndex = (currentIndexInEnabled + 1) % enabledModes.size
-                                                val nextMode = enabledModes[nextIndex]
-                                                switchInputMode(nextMode)
-                                                if (isHapticsEnabled) {
-                                                    view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
-                                                }
-                                            },
-                                            onLongClick = {
-                                                context.startActivity(Intent(context, QuickCycleActivity::class.java))
-                                            },
+                                // Mode picker
+                                InputModeDropdown(
+                                    currentMode = launchMode,
+                                    sharedPrefs = sharedPrefs,
+                                    onModeSelected = { mode ->
+                                        switchInputMode(mode)
+                                        if (isHapticsEnabled) {
+                                            view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                                        }
+                                    },
+                                ) { openMenu ->
+                                    Row(
+                                        modifier = Modifier
+                                            .height(28.dp)
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(Color.White.copy(alpha = 0.15f))
+                                            .combinedClickable(
+                                                onClickLabel = "Choose input mode",
+                                                onLongClickLabel = "Configure input mode cycle",
+                                                onClick = openMenu,
+                                                onLongClick = {
+                                                    context.startActivity(Intent(context, QuickCycleActivity::class.java))
+                                                },
+                                            )
+                                            .padding(horizontal = 8.dp)
+                                            .testTag("keyboard_mode_cycle_btn"),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Keyboard,
+                                            contentDescription = "Switch Mode",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(11.dp)
                                         )
-                                        .padding(horizontal = 8.dp)
-                                        .testTag("keyboard_mode_cycle_btn"),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Keyboard,
-                                        contentDescription = "Switch Mode",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(11.dp)
-                                    )
-                                    Text(
-                                        text = "Keyboard Mode",
-                                        color = Color.White,
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                        Text(
+                                            text = "Keyboard Mode",
+                                            color = Color.White,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Icon(Icons.Default.ArrowDropDown, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                    }
                                 }
 
                                 // Status LED and connection details
@@ -1272,37 +1276,33 @@ fun HomeScreen(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Circular Mode Toggle Indicator Button
-                            IconButton(
-                                onClick = {
-                                    val enabledModes = sharedPrefs.enabledInputModes().map(InputMode::id)
-                                    val currentIndex = enabledModes.indexOf(launchMode).coerceAtLeast(0)
-                                    val nextMode = enabledModes[(currentIndex + 1) % enabledModes.size]
-                                    launchMode = nextMode
-                                    sharedPrefs.edit { putInt("launch_mode", nextMode) }
+                            // Circular Mode Picker Button
+                            InputModeDropdown(
+                                currentMode = launchMode,
+                                sharedPrefs = sharedPrefs,
+                                onModeSelected = { mode ->
+                                    launchMode = mode
+                                    sharedPrefs.edit { putInt("launch_mode", mode) }
                                     if (isHapticsEnabled) {
                                         view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
                                     }
                                 },
-                                modifier = Modifier
-                                    .size(64.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.secondaryContainer)
-                                    .testTag("mode_toggle_btn")
-                            ) {
-                                val modeIcon = when (launchMode) {
-                                    1 -> Icons.Default.Mouse
-                                    2 -> Icons.Default.SportsEsports
-                                    4 -> Icons.Filled.SmartDisplay
-                                    InputMode.PHONE_KEYBOARD.id -> Icons.Default.PhoneAndroid
-                                    else -> Icons.Default.Keyboard
+                            ) { openMenu ->
+                                IconButton(
+                                    onClick = openMenu,
+                                    modifier = Modifier
+                                        .size(64.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.secondaryContainer)
+                                        .testTag("mode_toggle_btn")
+                                ) {
+                                    Icon(
+                                        imageVector = InputMode.fromId(launchMode).icon,
+                                        contentDescription = "Choose Input Mode",
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        modifier = Modifier.size(26.dp)
+                                    )
                                 }
-                                Icon(
-                                    imageVector = modeIcon,
-                                    contentDescription = "Cycle Input Mode",
-                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    modifier = Modifier.size(26.dp)
-                                )
                             }
 
                             // Dynamic Launch Option button

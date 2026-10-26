@@ -32,6 +32,8 @@ Every control surface in Bluke shares a consistent, unified top toolbar built ar
 * **Tap to Cycle:** Tapping any toolbar button quickly cycles through your active favorites (such as typing layouts, color themes, switch sound profiles, gamepad modes, or pointer speeds).
 * **Hold to Configure:** Long-pressing any toolbar button opens its full settings screen, allowing you to choose from the complete library or customize which options appear in your quick-cycle loop.
 
+The input mode button is the exception: tapping it opens a dropdown of your enabled modes so you can jump straight to one, and its last entry, **Edit modes…**, opens the mode settings.
+
 The toolbar also displays your connection status (green for active, red/gray for offline), the connected device name, and buttons to return Home or disconnect.
 
 ---
@@ -85,9 +87,10 @@ Bluke includes **three controller profiles** that switch instantly without disco
 ### Multimedia Remote
 A dedicated remote for couch media browsing and presentations.
 
-- **Presentation Controls:** Start a slideshow (F5), navigate slides (Next/Previous), or exit (Escape), with an integrated mini-touchpad for pointing.
+- **Presentation Controls:** Start a slideshow (F5), navigate slides (Next/Previous), or exit (Escape), with an optional mini-touchpad for pointing.
+- **Trackpad Toggle:** The trackpad and mouse buttons start hidden so the remote buttons can fill the screen. Tap **Trackpad** in the toolbar to show them; Bluke remembers your choice.
 - **Media Controls:** Play/Pause, Next/Previous track, and Volume Up/Down/Mute.
-- **Adaptive Layout:** Automatically rearranges buttons for easy one-handed thumb use whether holding your phone upright (portrait) or sideways (landscape).
+- **Adaptive Layout:** Automatically rearranges buttons for easy one-handed thumb use whether holding your phone upright (portrait) or sideways (landscape). The arrow pad turns with the phone, so each arrow always sends the direction it points.
 - **Phone Volume Buttons:** Optionally use your phone's physical volume rocker to adjust your computer's volume while the Multimedia screen is open.
 
 ---

@@ -14,6 +14,13 @@ For detailed usage instructions, see the [Usage Guide](docs/USAGE.md).
 - **Configurable Extra Keys:** Arrange rows of keys a phone keyboard lacks (Ctrl, Alt, Shift and Super as tap-to-latch modifiers, Esc, Tab, arrows, F-keys, symbols, host shortcuts) under Settings > Keyboard > Phone Keyboard.
 - **Host Keyboard Layouts & Unicode Entry:** Phone Keyboard and clipboard typing translate characters for the computer's layout (US, UK, German, Hungarian, French, Italian, Spanish, Swedish, Norwegian, Danish), with optional Linux, Windows and macOS Unicode entry for characters a layout cannot type.
 
+### Changed
+- **Input Mode Dropdown:** The mode button opens a list of your enabled modes instead of cycling to the next one.
+- **Multimedia Trackpad Hidden by Default:** The trackpad and mouse buttons now sit behind a toolbar toggle, and the remote buttons grow to fill the space.
+
+### Fixed
+- **Multimedia Arrows When Upright:** The arrow pad now turns with the phone, so each arrow sends the direction it points.
+
 ## [1.1.0] - 2026-10-09
 
 > [!IMPORTANT]

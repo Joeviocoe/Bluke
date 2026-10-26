@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Keyboard
@@ -291,25 +292,33 @@ fun PhoneKeyboardView(
                 Spacer(Modifier.width(4.dp))
                 Text("Close", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
             }
-            ToolbarPill(
-                onClick = {
-                    val enabled = sharedPrefs.enabledInputModes()
-                    val index = enabled.indexOfFirst { it.id == launchMode }.coerceAtLeast(0)
+            InputModeDropdown(
+                currentMode = launchMode,
+                sharedPrefs = sharedPrefs,
+                onModeSelected = { mode ->
                     hideKeyboard()
-                    onModeChange(enabled[(index + 1) % enabled.size].id)
+                    onModeChange(mode)
                 },
-                onLongClick = {
-                    context.startActivity(Intent(context, QuickCycleActivity::class.java))
-                },
-            ) {
-                Icon(Icons.Default.PhoneAndroid, "Switch mode", tint = Color.White, modifier = Modifier.size(12.dp))
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    InputMode.PHONE_KEYBOARD.displayName,
-                    color = Color.White,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                )
+            ) { openMenu ->
+                ToolbarPill(
+                    onClick = {
+                        hideKeyboard()
+                        openMenu()
+                    },
+                    onLongClick = {
+                        context.startActivity(Intent(context, QuickCycleActivity::class.java))
+                    },
+                ) {
+                    Icon(Icons.Default.PhoneAndroid, "Switch mode", tint = Color.White, modifier = Modifier.size(12.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        InputMode.PHONE_KEYBOARD.displayName,
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Icon(Icons.Default.ArrowDropDown, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                }
             }
             Spacer(Modifier.weight(1f))
             ToolbarPill(onClick = {
