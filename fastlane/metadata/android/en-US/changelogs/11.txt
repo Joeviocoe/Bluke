@@ -1,0 +1,6 @@
+• Bluetooth LE keyboard mode for hosts that ignore the classic link, including iPad and iPhone before iOS 13 (Settings > Behavior)
+• Phone Keyboard mode: type with your own keyboard app, with a text box or direct keystrokes
+• Configurable extra-key rows, host keyboard layouts and Unicode entry
+• Multimedia remote: long-press keys, speed and frame-step keys, colour-coded buttons, trackpad behind a toggle
+• Input mode dropdown and fullscreen toggle
+• Fixed Multimedia arrows and trackpad orientation when upright

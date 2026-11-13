@@ -225,7 +225,11 @@ Type on the computer with your phone's own keyboard app (Gboard, SwiftKey, and s
 * **Fix:** Tap **Retry** once. If it continues to fail, your phone's software does not support this feature.
 
 #### Apple / macOS / iOS Support
-* Apple devices have strict restrictions on third-party Bluetooth input peripherals, leading to inconsistent behavior. macOS and iOS devices are considered **unsupported / future scope**.
+* Apple devices have strict restrictions on third-party Bluetooth input peripherals, leading to inconsistent behavior over the classic connection.
+* **iOS 12 and earlier connects but never types over classic Bluetooth.** Android registers the HID service but leaves the phone's Bluetooth Class of Device as *Phone* (`0x5a020c`), and older iOS only accepts classic keyboard input from devices whose class is *Peripheral / Keyboard*. The iPad completes the connection and accepts every report, yet keeps its on-screen keyboard. Apps cannot change the device class.
+* **Fix: Bluetooth LE keyboard.** Turn on **Settings > Behavior > Bluetooth LE keyboard**. Bluke then also advertises as a Bluetooth LE keyboard (HID over GATT), which hosts identify from the HID service rather than the device class. Pair from the host's Bluetooth settings: the host connects to the phone, not the other way round. The Home screen shows a Bluetooth LE card with the advertising or connected state. Verified typing on an iPad 3 running iOS 9.3.5.
+* The Bluetooth LE link carries the keyboard only. Trackpad, controller and media keys are not sent over it; they keep working over the classic connection where a host supports that. The BLE report map deliberately has no report IDs: iOS 9 recognises Bluke's composite map as a keyboard but then discards every keystroke, while the plain boot-layout keyboard report types. **Developer Options > BLE Full Composite Report Map** switches the experimental composite map back on; forget and re-pair on the host after changing it.
+* Bluetooth LE pairing uses encryption without MITM protection, because Bluetooth 4.0 hosts such as the iPad 3 lack LE Secure Connections and would otherwise fail to pair. Treat the link as you would any Just Works pairing.
 
 ---
 

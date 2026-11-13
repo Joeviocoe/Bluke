@@ -18,10 +18,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BugReport
-import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Lightbulb
-import androidx.compose.material.icons.filled.Coffee
 import androidx.compose.material.icons.filled.Policy
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -146,7 +144,7 @@ class AboutActivity : ComponentActivity() {
                         ) {
                             // GitHub Repository Link Chip
                             Surface(
-                                onClick = { openUrl("https://github.com/arnav-kr/Bluke") },
+                                onClick = { openUrl("https://github.com/Joeviocoe/Bluke") },
                                 shape = CircleShape,
                                 color = MaterialTheme.colorScheme.primaryContainer,
                                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -172,35 +170,6 @@ class AboutActivity : ComponentActivity() {
                                 }
                             }
 
-                            Spacer(modifier = Modifier.width(8.dp))
-
-                            // Email Link Chip
-                            Surface(
-                                onClick = { openUrl("mailto:bluke@arnv.dev") },
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.primaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Email,
-                                        contentDescription = "Contact Email",
-                                        modifier = Modifier.size(18.dp),
-                                        tint = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Email",
-                                        fontWeight = FontWeight.Bold,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontSize = 14.sp
-                                    )
-                                }
-                            }
                         }
 
                         // Developer Heading and Card content wrapped in SettingsGroup for visual consistency
@@ -228,13 +197,13 @@ class AboutActivity : ComponentActivity() {
                                      }
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = "Arnav Kumar",
+                                            text = "Joeviocoe",
                                             style = MaterialTheme.typography.titleMedium,
                                             color = MaterialTheme.colorScheme.onSurface,
                                             fontWeight = FontWeight.Bold
                                         )
                                         Text(
-                                            text = "@arnav-kr",
+                                            text = "@Joeviocoe",
                                             style = MaterialTheme.typography.bodyMedium,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -251,7 +220,7 @@ class AboutActivity : ComponentActivity() {
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     PlayfulSocialButton(
-                                        onClick = { openUrl("https://github.com/arnav-kr") },
+                                        onClick = { openUrl("https://github.com/Joeviocoe") },
                                         label = "GitHub",
                                         icon = {
                                             Icon(
@@ -263,21 +232,14 @@ class AboutActivity : ComponentActivity() {
                                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
                                         contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                                     )
-                                    
-                                    PlayfulSocialButton(
-                                        onClick = { openUrl("https://buymeacoffee.com/arnavkr") },
-                                        label = "Buy Me a Coffee",
-                                        icon = {
-                                            Icon(
-                                                imageVector = Icons.Default.Coffee,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                        },
-                                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-                                    )
                                 }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = "Forked from Bluke by Arnav Kumar (github.com/arnav-kr/Bluke), AGPL-3.0.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
 
@@ -288,7 +250,7 @@ class AboutActivity : ComponentActivity() {
                                     title = "Changelogs",
                                     subtitle = "History of all the changes made to the app",
                                     icon = { Icon(Icons.Default.History, null, tint = MaterialTheme.colorScheme.primary) },
-                                    onClick = { openUrl("https://github.com/arnav-kr/Bluke/releases") }
+                                    onClick = { openUrl("https://github.com/Joeviocoe/Bluke/releases") }
                                 ),
                                 SettingsItemData(
                                     title = "Licenses",
@@ -300,13 +262,13 @@ class AboutActivity : ComponentActivity() {
                                     title = "Report issue",
                                     subtitle = "Report any issue or bug you have encountered while using the app",
                                     icon = { Icon(Icons.Default.BugReport, null, tint = MaterialTheme.colorScheme.primary) },
-                                    onClick = { openUrl("https://github.com/arnav-kr/Bluke/issues/new?template=bug_report.md") }
+                                    onClick = { openUrl("https://github.com/Joeviocoe/Bluke/issues/new?template=bug_report.md") }
                                 ),
                                 SettingsItemData(
                                     title = "Feature request",
                                     subtitle = "If you have any ideas or suggestions for the app, let us know",
                                     icon = { Icon(Icons.Default.Lightbulb, null, tint = MaterialTheme.colorScheme.primary) },
-                                    onClick = { openUrl("https://github.com/arnav-kr/Bluke/issues/new?template=feature_request.md") }
+                                    onClick = { openUrl("https://github.com/Joeviocoe/Bluke/issues/new?template=feature_request.md") }
                                 )
                             )
                         )

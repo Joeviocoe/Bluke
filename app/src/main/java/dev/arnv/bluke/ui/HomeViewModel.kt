@@ -4,6 +4,7 @@ import android.bluetooth.BluetoothDevice
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import dev.arnv.bluke.bluetooth.BleHidState
 import dev.arnv.bluke.bluetooth.BluetoothKeyboardManager
 import dev.arnv.bluke.bluetooth.BluetoothState
 import dev.arnv.bluke.bluetooth.HidLifecycleState
@@ -24,6 +25,8 @@ data class HomeUiState(
     val numLock: Boolean = true,
     val scrollLock: Boolean = false,
     val hidLifecycleState: HidLifecycleState = HidLifecycleState.Idle,
+    val bleHidState: BleHidState = BleHidState.Disabled,
+    val bleConnectedCentral: BluetoothDevice? = null,
 )
 
 class HomeViewModel(manager: BluetoothKeyboardManager) : ViewModel() {
@@ -61,7 +64,9 @@ class HomeViewModel(manager: BluetoothKeyboardManager) : ViewModel() {
             ::ConnectionState,
         ),
         manager.connectionTargetAddress,
-    ) { discovery, connection, targetAddress ->
+        manager.bleHidState,
+        manager.bleConnectedCentral,
+    ) { discovery, connection, targetAddress, bleState, bleCentral ->
         HomeUiState(
             bluetoothState = discovery.bluetoothState,
             statusMessage = discovery.statusMessage,
@@ -74,6 +79,8 @@ class HomeViewModel(manager: BluetoothKeyboardManager) : ViewModel() {
             numLock = connection.numLock,
             scrollLock = connection.scrollLock,
             hidLifecycleState = connection.hidLifecycleState,
+            bleHidState = bleState,
+            bleConnectedCentral = bleCentral,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -90,6 +97,8 @@ class HomeViewModel(manager: BluetoothKeyboardManager) : ViewModel() {
             numLock = manager.numLockState.value,
             scrollLock = manager.scrollLockState.value,
             hidLifecycleState = manager.lifecycleState.value,
+            bleHidState = manager.bleHidState.value,
+            bleConnectedCentral = manager.bleConnectedCentral.value,
         ),
     )
 

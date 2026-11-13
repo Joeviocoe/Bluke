@@ -189,6 +189,7 @@ class BluetoothKeyboardManager(private val context: Context) {
             if (action == BluetoothAdapter.ACTION_STATE_CHANGED) {
                 logHidEvent("broadcast adapter state=${intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, -1)} previous=${intent.getIntExtra(BluetoothAdapter.EXTRA_PREVIOUS_STATE, -1)}")
                 checkBluetoothCapabilities()
+                syncBleHidServer("adapter-state")
             } else if (action == BluetoothDevice.ACTION_BOND_STATE_CHANGED) {
                 val device: BluetoothDevice? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
@@ -313,6 +314,72 @@ class BluetoothKeyboardManager(private val context: Context) {
     )
     @Volatile
     private var registeredGamepadMode: GamepadDpadOutputMode? = null
+
+    // Bluetooth LE transport (HID over GATT). Runs beside the classic profile; see BleHidServer.
+    @Volatile private var bleHidServer: BleHidServer? = null
+    private var bleStateJob: Job? = null
+    private val _bleHidState = MutableStateFlow<BleHidState>(BleHidState.Disabled)
+    val bleHidState: StateFlow<BleHidState> = _bleHidState
+    private val _bleConnectedCentral = MutableStateFlow<BluetoothDevice?>(null)
+    val bleConnectedCentral: StateFlow<BluetoothDevice?> = _bleConnectedCentral
+
+    /** Start, restart or stop the BLE server so it matches preferences and the adapter state. */
+    @SuppressLint("MissingPermission")
+    private fun syncBleHidServer(reason: String) = synchronized(connectionSelectionLock) {
+        if (closed) return
+        val enabled = appPreferences.getBoolean(BLE_HID_ENABLED_PREFERENCE, false)
+        val map = BleReportMap.fromPreference(appPreferences.getString(BLE_REPORT_MAP_PREFERENCE, null))
+        val wanted = enabled && bluetoothAdapter?.isEnabled == true
+        val current = bleHidServer
+        if (!wanted) {
+            if (current != null) {
+                logHidEvent("ble server stop reason=$reason")
+                bleStateJob?.cancel()
+                bleStateJob = null
+                current.close()
+                bleHidServer = null
+                _bleHidState.value = BleHidState.Disabled
+                _bleConnectedCentral.value = null
+            }
+            return
+        }
+        if (current != null && current.reportMap == map) return
+        bleStateJob?.cancel()
+        current?.close()
+        val server = BleHidServer(context, map) { id, data -> if (id == KEYBOARD_REPORT_ID) applyLedReport(data) }
+        bleHidServer = server
+        bleStateJob = managerScope.launch {
+            launch { server.state.collect { _bleHidState.value = it } }
+            launch {
+                server.connectedCentral.collect { device ->
+                    _bleConnectedCentral.value = device
+                    if (device != null) resetKeyboardState()
+                    logHidEvent("ble central=${device?.address}")
+                }
+            }
+        }
+        logHidEvent("ble server start reason=$reason map=$map")
+        server.start()
+    }
+
+    /** Drop the connected BLE host; it may reconnect on its own while advertising resumes. */
+    fun disconnectBleCentral() {
+        bleHidServer?.disconnectCentral()
+    }
+
+    private fun sendBleInputReport(reportId: Int, report: ByteArray) {
+        bleHidServer?.sendInputReport(reportId, report)
+    }
+
+    /** Keyboard LED output report from either transport. A leading report ID byte is tolerated. */
+    private fun applyLedReport(data: ByteArray?) {
+        if (data == null || data.isEmpty()) return
+        val ledByte = if (data.size > 1 && data[0] == 1.toByte()) data[1].toInt() else data[0].toInt()
+        _numLockState.value = (ledByte and 0x01) != 0
+        _capsLockState.value = (ledByte and 0x02) != 0
+        _scrollLockState.value = (ledByte and 0x04) != 0
+        Log.d("BluetoothKeyboard", "Received LED report: byte=$ledByte, caps=${_capsLockState.value}, num=${_numLockState.value}, scroll=${_scrollLockState.value}")
+    }
     @Volatile
     private var gamepadDescriptorSwitchJob: Job? = null
     @Volatile
@@ -334,6 +401,10 @@ class BluetoothKeyboardManager(private val context: Context) {
     }
     private val behaviorPreferenceListener =
         android.content.SharedPreferences.OnSharedPreferenceChangeListener { preferences, key ->
+            if (key == BLE_HID_ENABLED_PREFERENCE || key == BLE_REPORT_MAP_PREFERENCE) {
+                syncBleHidServer("preference")
+                return@OnSharedPreferenceChangeListener
+            }
             if (key == GAMEPAD_DPAD_MODE_PREFERENCE) {
                 val newMode = GamepadDpadOutputMode.fromPreference(
                     preferences.getString(GAMEPAD_DPAD_MODE_PREFERENCE, null),
@@ -474,6 +545,7 @@ class BluetoothKeyboardManager(private val context: Context) {
             appPreferences.registerOnSharedPreferenceChangeListener(behaviorPreferenceListener)
             checkBluetoothCapabilities()
             registerBondReceiver()
+            syncBleHidServer("init")
         } catch (e: Throwable) {
             Log.e("BluetoothKeyboard", "Error during init: ${e.message}", e)
             publishServiceState(BluetoothState.ProfileNotSupported)
@@ -1301,18 +1373,7 @@ class BluetoothKeyboardManager(private val context: Context) {
             logHidEvent("callback virtualCableUnplug device=${device.address}")
         }
 
-        private fun parseLedReport(data: ByteArray?) {
-            if (data == null || data.isEmpty()) return
-            val ledByte = if (data.size > 1 && data[0] == 1.toByte()) {
-                data[1].toInt()
-            } else {
-                data[0].toInt()
-            }
-            _numLockState.value = (ledByte and 0x01) != 0
-            _capsLockState.value = (ledByte and 0x02) != 0
-            _scrollLockState.value = (ledByte and 0x04) != 0
-            Log.d("BluetoothKeyboard", "Received LED report: byte=$ledByte, caps=${_capsLockState.value}, num=${_numLockState.value}, scroll=${_scrollLockState.value}")
-        }
+        private fun parseLedReport(data: ByteArray?) = applyLedReport(data)
     }
 
     @SuppressLint("MissingPermission")
@@ -1645,23 +1706,22 @@ class BluetoothKeyboardManager(private val context: Context) {
             }
         }
 
-        // Transmit HID report
+        // Transmit HID report on whichever transports have a host
         if (dev != null) {
             submitReport(dev, reportId, report)
         }
+        sendBleInputReport(KEYBOARD_REPORT_ID, report)
     }
 
     @SuppressLint("MissingPermission")
     fun sendMouseReport(buttons: Byte, x: Byte, y: Byte, wheel: Byte) {
-        val dev = _connectedDevice.value
-        if (dev != null) {
-            val report = ByteArray(4)
-            report[0] = buttons
-            report[1] = x
-            report[2] = y
-            report[3] = wheel
-            submitReport(dev, 2, report) // Mouse report ID is 2
-        }
+        val report = ByteArray(4)
+        report[0] = buttons
+        report[1] = x
+        report[2] = y
+        report[3] = wheel
+        _connectedDevice.value?.let { dev -> submitReport(dev, MOUSE_REPORT_ID, report) }
+        sendBleInputReport(MOUSE_REPORT_ID, report)
     }
 
     @SuppressLint("MissingPermission")
@@ -1673,24 +1733,22 @@ class BluetoothKeyboardManager(private val context: Context) {
         rightXFloat: Float,
         rightYFloat: Float
     ) {
+        val report = buildGamepadReport(
+            buttonMask,
+            dpadMask,
+            leftXFloat,
+            leftYFloat,
+            rightXFloat,
+            rightYFloat,
+            gamepadDpadOutputMode,
+        )
+        sendBleInputReport(GAMEPAD_REPORT_ID, report)
         // Never encode Android buttons against a desktop descriptor while switching profiles.
         if (switchingGamepadDescriptor) return
         if (registeredGamepadMode?.let {
                 requiresGamepadDescriptorRestart(it, gamepadDpadOutputMode)
             } != false) return
-        val dev = _connectedDevice.value
-        if (dev != null) {
-            val report = buildGamepadReport(
-                buttonMask,
-                dpadMask,
-                leftXFloat,
-                leftYFloat,
-                rightXFloat,
-                rightYFloat,
-                gamepadDpadOutputMode,
-            )
-            submitReport(dev, 3, report) // Gamepad report ID is 3
-        }
+        _connectedDevice.value?.let { dev -> submitReport(dev, GAMEPAD_REPORT_ID, report) }
     }
 
 
@@ -1706,6 +1764,10 @@ class BluetoothKeyboardManager(private val context: Context) {
     fun releaseAllInputs() {
         connectionEpoch.incrementAndGet() // Discard held-input reports that have not been sent yet.
         resetKeyboardState()
+        sendBleInputReport(KEYBOARD_REPORT_ID, ByteArray(8))
+        sendBleInputReport(MOUSE_REPORT_ID, ByteArray(4))
+        sendBleInputReport(GAMEPAD_REPORT_ID, buildGamepadReport(0, 0, 0f, 0f, 0f, 0f, gamepadDpadOutputMode))
+        sendBleInputReport(CONSUMER_REPORT_ID, buildConsumerControlReport(null))
         val device = _connectedDevice.value ?: return
         submitReport(device, reportId, ByteArray(8))
         sendMouseReport(0, 0, 0, 0)
@@ -1773,6 +1835,10 @@ class BluetoothKeyboardManager(private val context: Context) {
         managerJob.cancel()
         resetKeyboardState()
         appPreferences.unregisterOnSharedPreferenceChangeListener(behaviorPreferenceListener)
+        bleHidServer?.close()
+        bleHidServer = null
+        _bleHidState.value = BleHidState.Disabled
+        _bleConnectedCentral.value = null
         stopScanning()
         if (isReceiverRegistered) {
             try {
@@ -1823,9 +1889,8 @@ class BluetoothKeyboardManager(private val context: Context) {
 
     @SuppressLint("MissingPermission")
     fun sendConsumerControl(control: ConsumerControl?) {
-        val dev = _connectedDevice.value
-        if (dev != null) {
-            submitReport(dev, 4, buildConsumerControlReport(control))
-        }
+        val report = buildConsumerControlReport(control)
+        _connectedDevice.value?.let { dev -> submitReport(dev, CONSUMER_REPORT_ID, report) }
+        sendBleInputReport(CONSUMER_REPORT_ID, report)
     }
 }

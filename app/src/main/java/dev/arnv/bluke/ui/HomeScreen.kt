@@ -303,7 +303,7 @@ fun HomeScreen(
             },
             dismissButton = {
                 androidx.compose.material3.TextButton(onClick = { 
-                    uriHandler.openUri("https://github.com/arnav-kr/Bluke/releases")
+                    uriHandler.openUri("https://github.com/Joeviocoe/Bluke/releases")
                 }) {
                     Text("Changelog")
                 }
@@ -311,8 +311,9 @@ fun HomeScreen(
         )
     }
 
-    // Connection helper declared at outer scope
-    val isConnected = btState is BluetoothState.Connected
+    // Connection helper declared at outer scope: a host on either transport counts.
+    val bleConnected = homeUiState.bleHidState is dev.arnv.bluke.bluetooth.BleHidState.Connected
+    val isConnected = btState is BluetoothState.Connected || bleConnected
     val offerSettingsPairingHelp = shouldOfferSettingsPairingHelp(btState, homeUiState.hidLifecycleState)
 
     LaunchedEffect(offerSettingsPairingHelp) {
@@ -807,7 +808,8 @@ fun HomeScreen(
                                 // Status LED and connection details
                                 val statusLedColor = if (isConnected) Color(0xFF39FF14) else Color(0xFFFF9800)
                                 // Use collected state (not .value) so UI reacts to changes from background
-                                val activeDevice = homeUiState.connectedDevice ?: lastConnectedDevice ?: btManager.getReconnectTarget()
+                                val activeDevice = homeUiState.connectedDevice ?: homeUiState.bleConnectedCentral
+                                    ?: lastConnectedDevice ?: btManager.getReconnectTarget()
                                 val deviceName = activeDevice?.name ?: "No Host"
                                 
                                 Box(
@@ -1232,6 +1234,18 @@ fun HomeScreen(
                                     },
                                     onRestartHid = btManager::restartHidService
                                 )
+                            }
+
+                            if (homeUiState.bleHidState !is dev.arnv.bluke.bluetooth.BleHidState.Disabled) {
+                                item {
+                                    BleHidStatusCard(
+                                        state = homeUiState.bleHidState,
+                                        onDisconnect = btManager::disconnectBleCentral,
+                                        onOpenSettings = {
+                                            context.startActivity(Intent(context, dev.arnv.bluke.BehaviorActivity::class.java))
+                                        },
+                                    )
+                                }
                             }
 
                             if (showTroubleshootingNudge) {

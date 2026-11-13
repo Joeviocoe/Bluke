@@ -148,7 +148,8 @@ class HelpActivity : ComponentActivity() {
                             title = "Platform limitations",
                             steps = listOf(
                                 "Support depends on the phone firmware exposing Android's Bluetooth HID Device role.",
-                                "Apple hosts may pair but can restrict composite keyboard, pointer, or gamepad functions; behavior varies by iOS/iPadOS release.",
+                                "iOS and iPadOS before 13 accept Bluke's classic connection but ignore its input, because Android keeps the phone's Bluetooth class as Phone rather than Keyboard. Turn on Bluetooth LE keyboard in Settings > Behavior and pair from the iPad's Bluetooth list instead.",
+                                "The Bluetooth LE link carries the keyboard only: trackpad, controller and media keys stay on the classic connection. Verified typing on an iPad 3 with iOS 9.3.5.",
                                 "Host audio routing prevention is a best-effort workaround for Linux and may be undone by the host or phone firmware.",
                                 "If Android repeatedly rejects HID registration, use Retry once. The incompatible-device screen appears only after the registration attempt ceiling."
                             )

@@ -55,8 +55,11 @@ class BluetoothSessionService : Service() {
 
         val manager = (application as BlukeApplication).bluetoothKeyboardManager
         scope.launch {
-            combine(manager.connectedDevice, manager.serviceState, manager.appVisible, manager.hasPendingConnection) { device, state, visible, pending ->
-                !shouldKeepBluetoothSession(visible, device != null, state, pending)
+            combine(
+                manager.connectedDevice, manager.serviceState, manager.appVisible, manager.hasPendingConnection,
+                manager.bleConnectedCentral,
+            ) { device, state, visible, pending, bleCentral ->
+                !shouldKeepBluetoothSession(visible, device != null || bleCentral != null, state, pending)
             }.collect { stop -> if (stop) stopSelf() }
         }
     }

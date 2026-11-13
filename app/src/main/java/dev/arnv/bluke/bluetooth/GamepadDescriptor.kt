@@ -1,6 +1,7 @@
 package dev.arnv.bluke.bluetooth
 
-internal val SHARED_HID_DESCRIPTOR = byteArrayOf(
+// Keyboard (Report ID 1)
+private val KEYBOARD_HID_COLLECTION = byteArrayOf(
     0x05.toByte(), 0x01.toByte(),         // USAGE_PAGE (Generic Desktop)
     0x09.toByte(), 0x06.toByte(),         // USAGE (Keyboard)
     0xa1.toByte(), 0x01.toByte(),         // COLLECTION (Application)
@@ -34,7 +35,9 @@ internal val SHARED_HID_DESCRIPTOR = byteArrayOf(
     0x29.toByte(), 0x65.toByte(),         //   USAGE_MAXIMUM (Keyboard Application)
     0x81.toByte(), 0x00.toByte(),         //   INPUT (Data,Ary,Abs) - Keycodes (6 bytes)
     0xc0.toByte(),                        // END_COLLECTION
+)
 
+private val POINTER_GAMEPAD_CONSUMER_HID_COLLECTIONS = byteArrayOf(
     // Mouse/Trackpad (Report ID 2)
     0x05.toByte(), 0x01.toByte(),         // USAGE_PAGE (Generic Desktop)
     0x09.toByte(), 0x02.toByte(),         // USAGE (Mouse)
@@ -127,6 +130,22 @@ internal val SHARED_HID_DESCRIPTOR = byteArrayOf(
     0x81.toByte(), 0x00.toByte(),         //   INPUT (Data,Ary,Abs)
     0xc0.toByte()                         // END_COLLECTION (Application)
 )
+
+internal val SHARED_HID_DESCRIPTOR = KEYBOARD_HID_COLLECTION + POINTER_GAMEPAD_CONSUMER_HID_COLLECTIONS
+
+/** The keyboard collection alone, for the BLE report map option aimed at strict hosts. */
+internal val KEYBOARD_ONLY_HID_DESCRIPTOR = KEYBOARD_HID_COLLECTION
+
+/**
+ * The keyboard collection with no REPORT_ID item: an 8-byte report identical to the boot
+ * keyboard layout, referenced as report ID 0. Older HOGP hosts (iOS 9) recognise a keyboard from
+ * the composite-free map but only consume reports laid out this way.
+ */
+internal val KEYBOARD_ONLY_NO_ID_HID_DESCRIPTOR: ByteArray = run {
+    val src = KEYBOARD_HID_COLLECTION
+    check(src[6] == 0x85.toByte() && src[7] == 0x01.toByte()) { "REPORT_ID item expected at offset 6" }
+    src.copyOfRange(0, 6) + src.copyOfRange(8, src.size)
+}
 
 // All modes advertise the same fields, even on cold launch. Receivers may cache SDP
 // across reconnects, so mode changes must only change the values inside these fields.

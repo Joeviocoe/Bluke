@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.core.content.edit
+import dev.arnv.bluke.bluetooth.BLE_REPORT_MAP_PREFERENCE
 import dev.arnv.bluke.ui.SettingsCardGroup
 import dev.arnv.bluke.ui.SettingsItemData
 import dev.arnv.bluke.ui.theme.MyApplicationTheme
@@ -42,6 +43,7 @@ class DeveloperOptionsActivity : ComponentActivity() {
                 var mockUnsupported by remember { mutableStateOf(sharedPrefs.getBoolean("mock_device_unsupported", false)) }
                 var mockGamepadGuide by remember { mutableStateOf(sharedPrefs.getBoolean("mock_gamepad_guide", false)) }
                 var mockTroubleshootingNudge by remember { mutableStateOf(sharedPrefs.getBoolean("mock_troubleshooting_nudge", false)) }
+                var bleFullMap by remember { mutableStateOf(sharedPrefs.getString(BLE_REPORT_MAP_PREFERENCE, null) == "full") }
 
                 // Easter egg states
                 val catEmojis = listOf("🐱", "😹", "😼")
@@ -126,6 +128,7 @@ class DeveloperOptionsActivity : ComponentActivity() {
                                             putBoolean("mock_hid_unsupported", false)
                                             putBoolean("mock_gamepad_guide", false)
                                             putBoolean("mock_troubleshooting_nudge", false)
+                                            remove(BLE_REPORT_MAP_PREFERENCE)
                                         }
                                         finish() // Exit screen
                                     }
@@ -145,6 +148,19 @@ class DeveloperOptionsActivity : ComponentActivity() {
                                     onClick = { 
                                         startActivity(Intent(this@DeveloperOptionsActivity, DeveloperLogsActivity::class.java))
                                     }
+                                ),
+                                SettingsItemData(
+                                    title = "BLE Full Composite Report Map",
+                                    subtitle = "Experimental: advertise keyboard, trackpad, controller and media keys over Bluetooth LE instead of the keyboard-only map. Older iOS recognises it but drops every keystroke. Forget and re-pair on the host after changing",
+                                    action = {
+                                        Switch(
+                                            checked = bleFullMap,
+                                            onCheckedChange = {
+                                                bleFullMap = it
+                                                sharedPrefs.edit { putString(BLE_REPORT_MAP_PREFERENCE, if (it) "full" else "keyboard_only") }
+                                            },
+                                        )
+                                    },
                                 ),
                                 SettingsItemData(
                                     title = "Force App Update Popup",

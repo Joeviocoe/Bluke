@@ -5,6 +5,8 @@ For detailed usage instructions, see the [Usage Guide](docs/USAGE.md).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-13
+
 ### Added
 - **Phone Keyboard Mode:** Type on the host with the phone's own keyboard app, in one of two styles:
   - **Text box:** a multi-line box with autocorrect, selection, copy and paste. Auto-type sends changes as you make them, or turn it off and press Type. Erase backspaces whatever the box typed on the host; Clear empties the box.
@@ -16,6 +18,7 @@ For detailed usage instructions, see the [Usage Guide](docs/USAGE.md).
 - **Multimedia Long-Press Keys:** Tap **B** to blank a slideshow to black, or long-press it for white (**W**). Tap **Esc** as before, or long-press it for **F** (fullscreen in YouTube, Netflix and VLC). Each button shows its long-press key in small type underneath.
 - **Multimedia Speed and Frame Keys:** Small keys fill the corners around the arrow pad: playback speed (tap **< >** for YouTube, long-press **[ ]** for VLC and mpv) above, and **, .** frame-step below.
 - **Fullscreen Toggle:** Settings > Look & Feel can keep the status and navigation bars visible while an input mode is open (fullscreen stays the default).
+- **Bluetooth LE keyboard (HID over GATT):** Settings > Behavior can additionally advertise Bluke as a Bluetooth LE keyboard. Hosts that connect over classic Bluetooth but ignore the input, notably iPad and iPhone before iOS 13, type over BLE (verified on an iPad 3 with iOS 9.3.5). The host pairs from its own Bluetooth settings and the Home screen shows the BLE state. The BLE link is keyboard-only; a developer option enables the experimental composite map with trackpad, controller and media keys.
 
 ### Changed
 - **Input Mode Dropdown:** The mode button opens a list of your enabled modes instead of cycling to the next one.

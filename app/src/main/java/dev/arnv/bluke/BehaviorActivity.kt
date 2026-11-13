@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
+import dev.arnv.bluke.bluetooth.BLE_HID_ENABLED_PREFERENCE
 import dev.arnv.bluke.ui.HARDWARE_VOLUME_REMOTE_PREFERENCE
 import dev.arnv.bluke.ui.SettingsCardGroup
 import dev.arnv.bluke.ui.SettingsItemData
@@ -34,6 +35,7 @@ class BehaviorActivity : ComponentActivity() {
                 var reconnect by remember { mutableStateOf(preferences.getBoolean("auto_connect", true)) }
                 var keepAudio by remember { mutableStateOf(preferences.getBoolean("disconnect_audio_profiles", false)) }
                 var volumeControlsHost by remember { mutableStateOf(preferences.getBoolean(HARDWARE_VOLUME_REMOTE_PREFERENCE, false)) }
+                var bleHid by remember { mutableStateOf(preferences.getBoolean(BLE_HID_ENABLED_PREFERENCE, false)) }
                 val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
                 Scaffold(
                     modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -59,6 +61,17 @@ class BehaviorActivity : ComponentActivity() {
                                 SettingsItemData("Show MAC addresses", "Useful when similarly named Bluetooth devices are nearby", { Icon(Icons.Default.Fingerprint, null, tint = MaterialTheme.colorScheme.primary) }, { Switch(showMac, { showMac = it; preferences.edit { putBoolean("show_mac", it) } }) }),
                                 SettingsItemData("Keep audio on this phone", "Best-effort workaround when a host takes over phone audio", { Icon(Icons.Default.MusicNote, null, tint = MaterialTheme.colorScheme.primary) }, { Switch(keepAudio, { keepAudio = it; preferences.edit { putBoolean("disconnect_audio_profiles", it) } }) }),
                                 SettingsItemData("Volume buttons control host volume", "Only while Multimedia is open", { Icon(Icons.AutoMirrored.Filled.VolumeUp, null, tint = MaterialTheme.colorScheme.primary) }, { Switch(volumeControlsHost, { volumeControlsHost = it; preferences.edit { putBoolean(HARDWARE_VOLUME_REMOTE_PREFERENCE, it) } }) }),
+                            ),
+                        )
+                        SettingsCardGroup(
+                            title = "Bluetooth LE",
+                            items = listOf(
+                                SettingsItemData(
+                                    "Bluetooth LE keyboard",
+                                    "Also advertise as a Bluetooth LE keyboard (HID over GATT) for iPad and iPhone before iOS 13 and other hosts that connect but ignore the classic link. Typing only; pair from the host's Bluetooth settings.",
+                                    { Icon(Icons.Default.Bluetooth, null, tint = MaterialTheme.colorScheme.primary) },
+                                    { Switch(bleHid, { bleHid = it; preferences.edit { putBoolean(BLE_HID_ENABLED_PREFERENCE, it) } }) },
+                                ),
                             ),
                         )
                         Spacer(Modifier.height(32.dp))
