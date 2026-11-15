@@ -152,6 +152,10 @@ Type on the computer with your phone's own keyboard app (Gboard, SwiftKey, and s
 * **Cause:** One device forgot the pairing while the other still has it saved, causing a connection conflict.
 * **Fix:** Delete the pairing on both your phone and computer, restart Bluetooth, and pair again.
 
+#### Windows lists the phone as "Unknown device" and the connection drops
+* **Cause:** Windows reads the phone's service list once, while pairing. If the pairing was started from Android's Bluetooth settings or finished while Bluke was in the background, Bluke's input service was not registered at that moment, so Windows paired a phone with no input service. It then refuses every input connection, and Bluke shows Connecting for about fifteen seconds before giving up.
+* **Fix:** Remove the phone on Windows and forget the computer on the phone. Open **Add a device** on Windows, then in Bluke tap **Scan** and tap the computer in the Discovered list so that Bluke starts the pairing itself. Accept the PIN on both screens, then tap **Connect**. Windows shows Bluke under *Other devices* because Android reports the phone's class as Phone; that is normal and does not affect input.
+
 #### Linux pairing prompt does not appear on the computer
 * **Cause:** Many Linux desktop systems (GNOME, KDE, Blueman) fail to show the pairing popup when a mobile keyboard initiates the connection.
 * **Fix:**

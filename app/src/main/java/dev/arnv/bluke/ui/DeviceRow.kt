@@ -42,101 +42,63 @@ enum class DeviceType(
 }
 
 /**
- * Keyword and Bluetooth major class categorization helper
+ * Categorise a device for the list icon and the supported/unsupported badge.
+ *
+ * The Bluetooth Class of Device is authoritative: a host that reports Computer or Phone is
+ * always a host, whatever it is called. Name keywords are only consulted when the device
+ * reports no class at all (common for BLE-only devices), and they match whole words so that
+ * a hostname such as "GameSpot" or "Catkin" is not mistaken for a controller or a mouse.
  */
 @SuppressLint("MissingPermission")
 fun classifyDevice(name: String?, device: BluetoothDevice?): DeviceType {
-    val devName = name?.lowercase() ?: ""
-    val majorClass = try {
-        device?.bluetoothClass?.majorDeviceClass
-    } catch (_: SecurityException) {
-        null
+    val bluetoothClass = try {
+        device?.bluetoothClass
     } catch (_: Exception) {
         null
     }
-
-    // 1. Mouse / Pointer / Keyboard / Peripheral devices
-    if (devName.contains("mouse") || devName.contains("atk") || devName.contains("g305") || 
-        devName.contains("trackpad") || devName.contains("pointer") || devName.contains("mx master") ||
-        devName.contains("keyboard") || devName.contains("keycap") || devName.contains("stylus") ||
-        majorClass == 1280 || majorClass == BluetoothClass.Device.Major.PERIPHERAL) {
-        
-        // Exclude gamepads reporting as peripheral accessories
-        if (devName.contains("controller") || devName.contains("gamepad") || devName.contains("xbox") || 
-            devName.contains("playstation") || devName.contains("ps4") || devName.contains("ps5") || 
-            devName.contains("switch") || devName.contains("joycon") || devName.contains("nintendo") || 
-            devName.contains("wireless controller")) {
-            return DeviceType.GAMEPAD
-        }
-        return DeviceType.MOUSE
-    }
-
-    // 2. Game controller / Gamepad
-    if (devName.contains("controller") || devName.contains("gamepad") || devName.contains("xbox") || 
-        devName.contains("playstation") || devName.contains("ps4") || devName.contains("ps5") || 
-        devName.contains("switch") || devName.contains("joycon") || devName.contains("nintendo") || 
-        devName.contains("wireless controller") || devName.contains("game") ||
-        majorClass == BluetoothClass.Device.Major.TOY) {
-        return DeviceType.GAMEPAD
-    }
-
-    val minorClass = try {
-        device?.bluetoothClass?.deviceClass
-    } catch (_: Exception) {
-        null
-    }
-    val isTvOrDisplay = minorClass == BluetoothClass.Device.AUDIO_VIDEO_VIDEO_DISPLAY_AND_LOUDSPEAKER ||
-                        minorClass == BluetoothClass.Device.AUDIO_VIDEO_VIDEO_MONITOR ||
-                        minorClass == BluetoothClass.Device.AUDIO_VIDEO_SET_TOP_BOX
-    if (isTvOrDisplay || devName.contains("tv") || devName.contains("television") || 
-        devName.contains("shield") || devName.contains("chromecast") || devName.contains("firestick") || 
-        devName.contains("roku") || devName.contains("tizen") || devName.contains("webos") || 
-        devName.contains("bravia") || devName.contains("mibox") || devName.contains("mi box")) {
-        return DeviceType.TV
-    }
-
-    // 3. Audio / Buds / Headphones (e.g. Earphones, audio receivers)
-    if (devName.contains("buds") || devName.contains("ear") || devName.contains("headphone") || 
-        devName.contains("headset") || devName.contains("audio") || devName.contains("speaker") || 
-        devName.contains("sound") || devName.contains("music") || devName.contains("cmf") ||
-        devName.contains("soundcore") || devName.contains("airpods") ||
-        majorClass == BluetoothClass.Device.Major.AUDIO_VIDEO) {
-        return DeviceType.AUDIO
-    }
-
-    // 4. Smartwatch / Wearable
-    if (devName.contains("watch") || devName.contains("wear") || devName.contains("fitbit") || 
-        devName.contains("band") || devName.contains("garmin") || devName.contains("wearable") || 
-        majorClass == BluetoothClass.Device.Major.WEARABLE) {
-        return DeviceType.WATCH
-    }
-
-    // 5. Computer / Laptop
-    if (devName.contains("laptop") || devName.contains("pc") || devName.contains("computer") || 
-        devName.contains("desktop") || devName.contains("mac") || devName.contains("linux") || 
-        devName.contains("windows") || devName.contains("host") || 
-        majorClass == BluetoothClass.Device.Major.COMPUTER) {
-        return DeviceType.COMPUTER
-    }
-
-    // 6. Phone / Smartphone / Tablet
-    if (devName.contains("phone") || devName.contains("galaxy") || devName.contains("iphone") || 
-        devName.contains("pixel") || devName.contains("oneplus") || devName.contains("xiaomi") || 
-        devName.contains("redmi") || devName.contains("mobile") || devName.contains("tablet") ||
-        majorClass == BluetoothClass.Device.Major.PHONE) {
-        return DeviceType.PHONE
-    }
-
-    // 7. TV / Chromecast / Smart Screen
-    // Checked above, fallback keyword search
-    if (devName.contains("tv") || devName.contains("shield") || devName.contains("appletv") || 
-        devName.contains("chromecast") || devName.contains("firestick") || devName.contains("television") || 
-        devName.contains("smart tv")) {
-        return DeviceType.TV
-    }
-
-    return DeviceType.DEFAULT
+    return classifyDevice(name, bluetoothClass?.majorDeviceClass, bluetoothClass?.deviceClass)
 }
+
+/** Pure classification from the name and the Class of Device fields, for tests and callers without a device. */
+fun classifyDevice(name: String?, majorClass: Int?, minorClass: Int?): DeviceType {
+    val words = name?.lowercase()?.split(NAME_WORD_SEPARATOR)?.filter { it.isNotEmpty() }?.toSet() ?: emptySet()
+    fun named(vararg keywords: String) = keywords.any { it in words }
+
+    when (majorClass) {
+        BluetoothClass.Device.Major.COMPUTER -> return DeviceType.COMPUTER
+        BluetoothClass.Device.Major.PHONE -> return DeviceType.PHONE
+        BluetoothClass.Device.Major.PERIPHERAL -> return if (named(*GAMEPAD_WORDS)) DeviceType.GAMEPAD else DeviceType.MOUSE
+        BluetoothClass.Device.Major.TOY -> return DeviceType.GAMEPAD
+        BluetoothClass.Device.Major.WEARABLE -> return DeviceType.WATCH
+        BluetoothClass.Device.Major.AUDIO_VIDEO -> {
+            val isTvOrDisplay = minorClass == BluetoothClass.Device.AUDIO_VIDEO_VIDEO_DISPLAY_AND_LOUDSPEAKER ||
+                minorClass == BluetoothClass.Device.AUDIO_VIDEO_VIDEO_MONITOR ||
+                minorClass == BluetoothClass.Device.AUDIO_VIDEO_SET_TOP_BOX
+            return if (isTvOrDisplay || named(*TV_WORDS)) DeviceType.TV else DeviceType.AUDIO
+        }
+    }
+
+    // No usable class: fall back to whole-word name hints, hosts first.
+    return when {
+        named(*COMPUTER_WORDS) -> DeviceType.COMPUTER
+        named(*PHONE_WORDS) -> DeviceType.PHONE
+        named(*TV_WORDS) -> DeviceType.TV
+        named(*GAMEPAD_WORDS) -> DeviceType.GAMEPAD
+        named(*POINTER_WORDS) -> DeviceType.MOUSE
+        named(*AUDIO_WORDS) -> DeviceType.AUDIO
+        named(*WATCH_WORDS) -> DeviceType.WATCH
+        else -> DeviceType.DEFAULT
+    }
+}
+
+private val NAME_WORD_SEPARATOR = Regex("[^a-z0-9]+")
+private val COMPUTER_WORDS = arrayOf("laptop", "pc", "computer", "desktop", "mac", "macbook", "imac", "linux", "windows", "host")
+private val PHONE_WORDS = arrayOf("phone", "galaxy", "iphone", "pixel", "oneplus", "xiaomi", "redmi", "mobile", "tablet", "ipad")
+private val TV_WORDS = arrayOf("tv", "television", "shield", "chromecast", "firestick", "roku", "tizen", "webos", "bravia", "mibox", "appletv")
+private val GAMEPAD_WORDS = arrayOf("controller", "gamepad", "xbox", "playstation", "ps4", "ps5", "joycon", "nintendo", "dualsense", "dualshock")
+private val POINTER_WORDS = arrayOf("mouse", "trackpad", "pointer", "keyboard", "stylus")
+private val AUDIO_WORDS = arrayOf("buds", "earbuds", "headphone", "headphones", "headset", "audio", "speaker", "soundcore", "airpods")
+private val WATCH_WORDS = arrayOf("watch", "fitbit", "band", "garmin", "wearable")
 
 /**
  * Beautiful device row for bonded or discovered host entities with dynamic visual categorization

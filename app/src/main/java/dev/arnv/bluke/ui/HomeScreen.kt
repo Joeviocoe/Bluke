@@ -10,7 +10,6 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import android.content.pm.ActivityInfo
 import android.os.Build
-import android.os.SystemClock
 import android.view.View
 import androidx.compose.animation.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -26,7 +25,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -55,7 +53,6 @@ import androidx.compose.ui.res.stringResource
 import dev.arnv.bluke.R
 import dev.arnv.bluke.KeyboardThemesActivity
 import dev.arnv.bluke.KeyboardLayoutsActivity
-import dev.arnv.bluke.HelpActivity
 import dev.arnv.bluke.QuickCycleActivity
 import dev.arnv.bluke.SoundPacksActivity
 import androidx.compose.ui.unit.sp
@@ -214,17 +211,10 @@ fun HomeScreen(
             sharedPrefs.edit { putInt("launch_mode", newMode) }
         }
     }
-    var connectionAttempts by rememberSaveable { mutableIntStateOf(0) }
-    var showTroubleshootingNudge by rememberSaveable { mutableStateOf(false) }
-    var previousConnectionState by remember { mutableStateOf<Boolean?>(null) }
-    var connectionTransitions by remember { mutableStateOf(emptyList<Long>()) }
 
     LaunchedEffect(devModeRefreshTrigger) {
         if (sharedPrefs.getBoolean("is_developer_mode", false)) {
             if (sharedPrefs.getBoolean("mock_gamepad_guide", false)) showGamepadGuide = true
-            if (sharedPrefs.getBoolean("mock_troubleshooting_nudge", false)) {
-                showTroubleshootingNudge = true
-            }
         }
     }
 
@@ -314,46 +304,6 @@ fun HomeScreen(
     // Connection helper declared at outer scope: a host on either transport counts.
     val bleConnected = homeUiState.bleHidState is dev.arnv.bluke.bluetooth.BleHidState.Connected
     val isConnected = btState is BluetoothState.Connected || bleConnected
-    val offerSettingsPairingHelp = shouldOfferSettingsPairingHelp(btState, homeUiState.hidLifecycleState)
-
-    LaunchedEffect(offerSettingsPairingHelp) {
-        if (offerSettingsPairingHelp) showTroubleshootingNudge = true
-    }
-
-    LaunchedEffect(isConnected) {
-        val previousState = previousConnectionState
-        if (previousState != null && previousState != isConnected) {
-            val now = SystemClock.elapsedRealtime()
-            connectionTransitions = (connectionTransitions + now).filter {
-                now - it <= CONNECTION_HELP_CHURN_WINDOW_MILLIS
-            }
-            if (
-                shouldOfferConnectionHelp(
-                    transitionTimestamps = connectionTransitions,
-                    nowMillis = now,
-                )
-            ) {
-                showTroubleshootingNudge = true
-            }
-        }
-        previousConnectionState = isConnected
-        if (isConnected) {
-            connectionAttempts = 0
-            showTroubleshootingNudge = false
-        }
-    }
-
-    LaunchedEffect(btMessage, isConnected) {
-        val attemptInProgress = btMessage.contains("connecting", ignoreCase = true) ||
-            btMessage.contains("pairing", ignoreCase = true) ||
-            btMessage.contains("switching", ignoreCase = true)
-        if (!isConnected && attemptInProgress) {
-            kotlinx.coroutines.delay(CONNECTION_HELP_STALL_MILLIS)
-            if (shouldOfferConnectionHelp(stalledForMillis = CONNECTION_HELP_STALL_MILLIS)) {
-                showTroubleshootingNudge = true
-            }
-        }
-    }
 
     if (showGamepadGuide) {
         AlertDialog(
@@ -1248,21 +1198,6 @@ fun HomeScreen(
                                 }
                             }
 
-                            if (showTroubleshootingNudge) {
-                                item {
-                                    TroubleshootingNudgeCard(
-                                        offerSettingsPairingHelp = offerSettingsPairingHelp,
-                                        onScan = { btManager.startScanning() },
-                                        onOpenHelp = {
-                                            context.startActivity(Intent(context, HelpActivity::class.java))
-                                        },
-                                        onDismiss = {
-                                            showTroubleshootingNudge = false
-                                            sharedPrefs.edit { putBoolean("mock_troubleshooting_nudge", false) }
-                                        },
-                                    )
-                                }
-                            }
 
                             DeviceListSection(
                                 bluetoothState = btState,
@@ -1279,13 +1214,7 @@ fun HomeScreen(
                                 isDiscoveredExpanded = isDiscoveredExpanded,
                                 onPairedExpandedChange = { isPairedExpanded = it },
                                 onDiscoveredExpandedChange = { isDiscoveredExpanded = it },
-                                onConnect = { device ->
-                                    connectionAttempts += 1
-                                    if (shouldOfferConnectionHelp(connectionAttempts = connectionAttempts)) {
-                                        showTroubleshootingNudge = true
-                                    }
-                                    btManager.connectDevice(device)
-                                },
+                                onConnect = btManager::connectDevice,
                                 onDisconnect = btManager::disconnectDevice
                             )
                         }
@@ -1385,48 +1314,3 @@ fun HomeScreen(
 
 }
 
-@Composable
-private fun TroubleshootingNudgeCard(
-    offerSettingsPairingHelp: Boolean,
-    onScan: () -> Unit,
-    onOpenHelp: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-        ),
-        shape = RoundedCornerShape(24.dp),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Icon(Icons.AutoMirrored.Filled.HelpOutline, contentDescription = null)
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Having trouble connecting?", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    if (offerSettingsPairingHelp) {
-                        "If you paired through Bluetooth settings, forget the pairing on both devices, then use Scan in Bluke to pair and connect again."
-                    } else {
-                        "Check both pairing prompts or follow the safe repair steps. A slow attempt does not automatically mean this phone is incompatible."
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (offerSettingsPairingHelp) {
-                        TextButton(onClick = onScan) { Text("Scan") }
-                    }
-                    TextButton(onClick = onOpenHelp) { Text("Help") }
-                }
-            }
-            IconButton(onClick = onDismiss) {
-                Icon(Icons.Default.Close, contentDescription = "Dismiss")
-            }
-        }
-    }
-}

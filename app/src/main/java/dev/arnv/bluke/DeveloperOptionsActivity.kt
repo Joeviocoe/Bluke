@@ -42,7 +42,6 @@ class DeveloperOptionsActivity : ComponentActivity() {
                 var mockBtDisabled by remember { mutableStateOf(sharedPrefs.getBoolean("mock_bt_disabled", false)) }
                 var mockUnsupported by remember { mutableStateOf(sharedPrefs.getBoolean("mock_device_unsupported", false)) }
                 var mockGamepadGuide by remember { mutableStateOf(sharedPrefs.getBoolean("mock_gamepad_guide", false)) }
-                var mockTroubleshootingNudge by remember { mutableStateOf(sharedPrefs.getBoolean("mock_troubleshooting_nudge", false)) }
                 var bleFullMap by remember { mutableStateOf(sharedPrefs.getString(BLE_REPORT_MAP_PREFERENCE, null) == "full") }
 
                 // Easter egg states
@@ -127,7 +126,6 @@ class DeveloperOptionsActivity : ComponentActivity() {
                                             putBoolean("mock_device_unsupported", false)
                                             putBoolean("mock_hid_unsupported", false)
                                             putBoolean("mock_gamepad_guide", false)
-                                            putBoolean("mock_troubleshooting_nudge", false)
                                             remove(BLE_REPORT_MAP_PREFERENCE)
                                         }
                                         finish() // Exit screen
@@ -184,19 +182,6 @@ class DeveloperOptionsActivity : ComponentActivity() {
                                             onCheckedChange = {
                                                 mockGamepadGuide = it
                                                 sharedPrefs.edit { putBoolean("mock_gamepad_guide", it) }
-                                            },
-                                        )
-                                    },
-                                ),
-                                SettingsItemData(
-                                    title = "Force Troubleshooting Nudge",
-                                    subtitle = "Shows the contextual connection-help card on Home",
-                                    action = {
-                                        Switch(
-                                            checked = mockTroubleshootingNudge,
-                                            onCheckedChange = {
-                                                mockTroubleshootingNudge = it
-                                                sharedPrefs.edit { putBoolean("mock_troubleshooting_nudge", it) }
                                             },
                                         )
                                     },

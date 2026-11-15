@@ -1,0 +1,2 @@
+• Computers and phones are no longer tagged UNSUPPORTED because of a word in their name; the Bluetooth device class decides first
+• Removed the "Having trouble connecting?" card that covered the device list

@@ -5,6 +5,14 @@ For detailed usage instructions, see the [Usage Guide](docs/USAGE.md).
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-11-15
+
+### Fixed
+- **Hosts Marked Unsupported by Name:** Bluke judged a discovered device by keywords in its name before looking at its Bluetooth device class, so a computer called "GameSpot" or "Catkin" was tagged UNSUPPORTED with Connect disabled, and pairing it meant going through Android's Bluetooth settings while Bluke's input service was unregistered. The device class now decides first, and name keywords only apply to devices that report no class, matching whole words.
+
+### Removed
+- **"Having trouble connecting?" card:** The Home screen card that appeared after slow or repeated connection attempts and pushed the device list down is gone, along with its developer toggle.
+
 ## [1.2.0] - 2026-11-13
 
 ### Added
